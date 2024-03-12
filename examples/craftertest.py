@@ -1,5 +1,5 @@
 import sys
-sys.path.append("/home/mishaal/dreamerv2")
+sys.path.append("/home/mrmackamoo/valuedream")
 import gym
 import crafter
 import dreamerv2.api as dv2

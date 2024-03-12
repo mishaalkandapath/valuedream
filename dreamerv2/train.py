@@ -29,8 +29,10 @@ import common
 
 def main():
 
-  configs = yaml.safe_load((
-      pathlib.Path(sys.argv[0]).parent / 'configs.yaml').read_text())
+  #configs = yaml.safe_load((
+  #    pathlib.Path(sys.argv[0]).parent / 'configs.yaml').read_text())
+  yaml_loader = yaml.YAML(typ="safe", pure=True)
+  configs = yaml_loader.load((pathlib.Path(sys.argv[0]).parent / 'configs.yaml').read_text())
   parsed, remaining = common.Flags(configs=['defaults']).parse(known_only=True)
   config = common.Config(configs['defaults'])
   for name in parsed.configs:
@@ -51,8 +53,8 @@ def main():
     tf.config.experimental.set_memory_growth(gpu, True)
   assert config.precision in (16, 32), config.precision
   if config.precision == 16:
-    from tensorflow.keras.mixed_precision import experimental as prec
-    prec.set_policy(prec.Policy('mixed_float16'))
+    import tensorflow.keras.mixed_precision as prec #import experimental as prec
+    prec.set_global_policy(prec.Policy('mixed_float16')) # used to be set_policy
 
   train_replay = common.Replay(logdir / 'train_episodes', **config.replay)
   eval_replay = common.Replay(logdir / 'eval_episodes', **dict(
