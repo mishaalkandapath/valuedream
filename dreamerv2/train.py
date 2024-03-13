@@ -29,7 +29,9 @@ import common
 
 def main():
 
-  configs = yaml.safe_load((
+  yaml_loader = yaml.YAML(typ='safe', pure=True)
+  
+  configs = yaml_loader.load((
       pathlib.Path(sys.argv[0]).parent / 'configs.yaml').read_text())
   parsed, remaining = common.Flags(configs=['defaults']).parse(known_only=True)
   config = common.Config(configs['defaults'])
@@ -51,8 +53,8 @@ def main():
     tf.config.experimental.set_memory_growth(gpu, True)
   assert config.precision in (16, 32), config.precision
   if config.precision == 16:
-    from tensorflow.keras.mixed_precision import experimental as prec
-    prec.set_policy(prec.Policy('mixed_float16'))
+    import tensorflow.keras.mixed_precision as prec
+    prec.set_global_policy(prec.Policy('mixed_float16'))
 
   train_replay = common.Replay(logdir / 'train_episodes', **config.replay)
   eval_replay = common.Replay(logdir / 'eval_episodes', **dict(
@@ -86,11 +88,15 @@ def main():
           config.atari_grayscale)
       env = common.OneHotAction(env)
     elif suite == 'crafter':
+      print('suite got crafter')
       assert config.action_repeat == 1
       outdir = logdir / 'crafter' if mode == 'train' else None
       reward = bool(['noreward', 'reward'].index(task)) or mode == 'eval'
       env = common.Crafter(outdir, reward)
       env = common.OneHotAction(env)
+   #Need to implement a new env
+    elif suite == 'moonlander':
+       pass
     else:
       raise NotImplementedError(suite)
     env = common.TimeLimit(env, config.time_limit)

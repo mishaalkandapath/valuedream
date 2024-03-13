@@ -1,9 +1,9 @@
 import gym
-import gym_minigrid
+
 import dreamerv2.api as dv2
 
 config = dv2.defaults.update({
-    'logdir': '~/logdir/minigrid',
+    'logdir': '~/logdir/',
     'log_every': 1e3,
     'train_every': 10,
     'prefill': 1e5,
@@ -12,6 +12,6 @@ config = dv2.defaults.update({
     'discount': 0.99,
 }).parse_flags()
 
-env = gym.make('MiniGrid-DoorKey-6x6-v0')
-env = gym_minigrid.wrappers.RGBImgPartialObsWrapper(env)
+env = gym.make('LunarLander-v2')
 dv2.train(env, config)
+
