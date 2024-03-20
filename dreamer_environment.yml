@@ -75,4 +75,4 @@ dependencies:
       - werkzeug==3.0.1
       - wrapt==1.12.1
       - zipp==3.17.0
-prefix: /home/mishaal/miniconda3/envs/dreamerenv
+prefix: /Users/mrmackamoo/miniconda3/envs/dreamerenv
