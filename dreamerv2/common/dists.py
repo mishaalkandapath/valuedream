@@ -4,6 +4,7 @@ from tensorflow_probability import distributions as tfd
 
 
 # Patch to ignore seed to avoid synchronization across GPUs.
+# you dont want all the GPUs to have the same seed, so you set the seed to None (Coz otherwise they will have the same numbers)
 _orig_random_categorical = tf.random.categorical
 def random_categorical(*args, **kwargs):
   kwargs['seed'] = None
@@ -50,7 +51,7 @@ class OneHotDist(tfd.OneHotCategorical):
 
   def __init__(self, logits=None, probs=None, dtype=None):
     self._sample_dtype = dtype or tf.float32
-    super().__init__(logits=logits, probs=probs)
+    super().__init__(logits=logits, probs=probs) # construct a one hot distribution according to the following probabilities
 
   def mode(self):
     return tf.cast(super().mode(), self._sample_dtype)
@@ -59,7 +60,8 @@ class OneHotDist(tfd.OneHotCategorical):
     # Straight through biased gradient estimator.
     sample = tf.cast(super().sample(sample_shape, seed), self._sample_dtype)
     probs = self._pad(super().probs_parameter(), sample.shape)
-    sample += tf.cast(probs - tf.stop_gradient(probs), self._sample_dtype)
+    sample += tf.cast(probs - tf.stop_gradient(probs), self._sample_dtype) # straight through gradients coz sampling is non-differentiable
+    # you want the rest of the gradients to just pass through and not zero out wen itgets here. 
     return sample
 
   def _pad(self, tensor, shape):
@@ -72,7 +74,7 @@ class OneHotDist(tfd.OneHotCategorical):
 class TruncNormalDist(tfd.TruncatedNormal):
 
   def __init__(self, loc, scale, low, high, clip=1e-6, mult=1):
-    super().__init__(loc, scale, low, high)
+    super().__init__(loc, scale, low, high) #loc is mean, scale is standard deviation, low and high refer to the truncation range.
     self._clip = clip
     self._mult = mult
 
@@ -80,18 +82,18 @@ class TruncNormalDist(tfd.TruncatedNormal):
     event = super().sample(*args, **kwargs)
     if self._clip:
       clipped = tf.clip_by_value(
-          event, self.low + self._clip, self.high - self._clip)
-      event = event - tf.stop_gradient(event) + tf.stop_gradient(clipped)
+          event, self.low + self._clip, self.high - self._clip) #ensure this range
+      event = event - tf.stop_gradient(event) + tf.stop_gradient(clipped) #stop through gradients again. event directly contributes to gradient as 1. 
     if self._mult:
       event *= self._mult
     return event
 
 
-class TanhBijector(tfp.bijectors.Bijector):
+class TanhBijector(tfp.bijectors.Bijector): # transform a random variable with range (-inf, inf) to (-1, 1)
 
   def __init__(self, validate_args=False, name='tanh'):
     super().__init__(
-        forward_min_event_ndims=0,
+        forward_min_event_ndims=0, #operate on scalar vals
         validate_args=validate_args,
         name=name)
 
@@ -108,6 +110,6 @@ class TanhBijector(tfp.bijectors.Bijector):
     y = tf.cast(y, dtype)
     return y
 
-  def _forward_log_det_jacobian(self, x):
+  def _forward_log_det_jacobian(self, x): #the log of the jacobian of the forward transformation
     log2 = tf.math.log(tf.constant(2.0, dtype=x.dtype))
     return 2.0 * (log2 - x - tf.nn.softplus(-2.0 * x))

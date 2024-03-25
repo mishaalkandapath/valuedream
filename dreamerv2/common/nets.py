@@ -16,27 +16,27 @@ class EnsembleRSSM(common.Module):
       act='elu', norm='none', std_act='softplus', min_std=0.1):
     super().__init__()
     self._ensemble = ensemble
-    self._stoch = stoch
-    self._deter = deter
-    self._hidden = hidden
-    self._discrete = discrete
-    self._act = get_act(act)
+    self._stoch = stoch #size of the stochastic state representation -- whihc is the state 
+    self._deter = deter # hidden state representation size
+    self._hidden = hidden 
+    self._discrete = discrete # do we wanna discretize the codes (the number of channels?)
+    self._act = get_act(act) # get activation function
     self._norm = norm
-    self._std_act = std_act
-    self._min_std = min_std
+    self._std_act = std_act # activation function for the std predictions
+    self._min_std = min_std #for the std predictions
     self._cell = GRUCell(self._deter, norm=True)
     self._cast = lambda x: tf.cast(x, prec.global_policy().compute_dtype)
 
-  def initial(self, batch_size):
+  def initial(self, batch_size): #initialize architecture of the model
     dtype = prec.global_policy().compute_dtype
     if self._discrete:
-      state = dict(
-          logit=tf.zeros([batch_size, self._stoch, self._discrete], dtype),
-          stoch=tf.zeros([batch_size, self._stoch, self._discrete], dtype),
-          deter=self._cell.get_initial_state(None, batch_size, dtype))
+      state = dict( #self.discrete coz for a discrete probability distribution
+          logit=tf.zeros([batch_size, self._stoch, self._discrete], dtype), #probability of the values of the stoch state values
+          stoch=tf.zeros([batch_size, self._stoch, self._discrete], dtype), # stochastic state
+          deter=self._cell.get_initial_state(None, batch_size, dtype))#deterministic state
     else:
       state = dict(
-          mean=tf.zeros([batch_size, self._stoch], dtype),
+          mean=tf.zeros([batch_size, self._stoch], dtype), #similarly mean and variance. 
           std=tf.zeros([batch_size, self._stoch], dtype),
           stoch=tf.zeros([batch_size, self._stoch], dtype),
           deter=self._cell.get_initial_state(None, batch_size, dtype))
@@ -91,7 +91,7 @@ class EnsembleRSSM(common.Module):
     # if is_first.any():
     prev_state, prev_action = tf.nest.map_structure(
         lambda x: tf.einsum(
-            'b,b...->b...', 1.0 - is_first.astype(x.dtype), x),
+            'b,b...->b...', 1.0 - is_first.astype(x.dtype), x),# take everything except the first?
         (prev_state, prev_action))
     prior = self.img_step(prev_state, prev_action, sample)
     x = tf.concat([prior['deter'], embed], -1)
@@ -314,7 +314,7 @@ class MLP(common.Module):
     return self.get('out', DistLayer, self._shape, **self._out)(x)
 
 
-class GRUCell(tf.keras.layers.AbstractRNNCell):
+class GRUCell(tf.keras.layers.AbstractRNNCell): #standard GRU cell
 
   def __init__(self, size, norm=False, act='tanh', update_bias=-1, **kwargs):
     super().__init__()
@@ -408,8 +408,8 @@ class NormLayer(common.Module):
 def get_act(name):
   if name == 'none':
     return tf.identity
-  if name == 'mish':
-    return lambda x: x * tf.math.tanh(tf.nn.softplus(x))
+  if name == 'mish':#aal hehe
+    return lambda x: x * tf.math.tanh(tf.nn.softplus(x)) # softplus is a smooth approximator of the ReLU function
   elif hasattr(tf.nn, name):
     return getattr(tf.nn, name)
   elif hasattr(tf, name):

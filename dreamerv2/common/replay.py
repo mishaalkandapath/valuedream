@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 
 
-class Replay:
+class Replay: #replay buffer for storing and sampling transitionsfrom episodes
 
   def __init__(
       self, directory, capacity=0, ongoing=False, minlen=1, maxlen=0,
