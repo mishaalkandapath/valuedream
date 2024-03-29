@@ -1,11 +1,11 @@
 import sys
-sys.path.append("/home/mishaal/dreamerv2")
+sys.path.append("/home/mishaal/valuedream")
 import gym
 import crafter
 import dreamerv2.api as dv2
 
 config = dv2.defaults.update({
-    'logdir': '~/logdir/crafter',
+    'logdir': '~/logdir/crafter2',
     'log_every': 1e3,
     'train_every': 10,
     'prefill': 1e5,

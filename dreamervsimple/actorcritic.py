@@ -3,26 +3,27 @@ import torch
 import torch.nn as nn
 from torch.distributions import Categorical, Normal
 from collections import OrderedDict
-#Actor MLP - output actions that maximize the prediction of long-term future rewards made by the critic. Max the same lambda as the critic 
+
 class BaseMLP(nn.Module):
-    def __init__(self, in_state_shape, out_shape, inter_units, layers):
+    def __init__(self, in_state_shape, out_shape, inter_units, layers, act="relu"):
         super().__init__()
         seq_list = OrderedDict([
             ('fc1', nn.Linear(in_state_shape, inter_units)),
-            ('relu1', nn.ReLU())
+            ('relu1', nn.ReLU()) if act == "relu" else ('elu1', nn.ELU())
         ])
         for _ in range(layers - 1):
             seq_list.update({
                 f'fc{len(seq_list)}': nn.Linear(inter_units, inter_units),
                 f'norm{len(seq_list)}': nn.LayerNorm(inter_units),
-                f'relu{len(seq_list)}': nn.ReLU()
+                f'relu{len(seq_list)}': nn.ReLU() if act == "relu" else ('elu{len(seq_list)}', nn.ELU())
             })
         seq_list.update({"outlayer": nn.Linear(inter_units, out_shape)})
         self.seq = nn.Sequential(seq_list)
 
     def forward(self, x):
         return self.seq(x) 
-
+    
+#Actor MLP - output actions that maximize the prediction of long-term future rewards made by the critic. Max the same lambda as the critic 
 class ActorCritic():
     def __init__(self, batch_size, in_state_shape, action_shape, inter_units, layers,
                  slow_target=False, alr=1e-4, clr=1e-4):
@@ -51,9 +52,21 @@ class ActorCritic():
         return (loss * seq[:-2]).detach().mean()
     
     def critic_loss(self, seq, target_values):
-        # dist = Normal(self.critic(seq[0][:-1]))
-        loss = 0.5 * (target_values[1:] - self.target_critic(seq[0][1:]).detach()).pow(2)
+        dist = Normal(self.critic(seq["state_rep"][:-1]), 1.0)
+        weight = #TODO
+        loss = -dist.log_prob(target_values[:-1]) * weight[:-1].detach()
         return loss.mean()
+
+    def target(self, seq):
+        reward = seq["reward"].astype(torch.float32)
+        disc = seq["discount"].astype(torch.float32)
+        value = Normal(self.critic(seq["feat"]), 1.0)
+        target = self.lambda_return(reward[:-1], value[:-1], disc[:-1], value[-1], 0.8, axis=0)
+        return target
+
+    def lambda_return(self, rewards, value, disc, bootstrap, lambda_, axis=0):
+        # Setting lambda=1 gives a discounted Monte Carlo return.
+        # Setting lambda=0 gives a fixed 1-step return.
 
     def plan(self, 
              world_model, # this is equivalent to querying the environment if you dont have a model, so pass in the environment here if no model 
@@ -87,3 +100,7 @@ class ActorCritic():
                 target_param.data.copy_(target_param.data * (1.0 - target_update) + param.data * target_update)
 
 
+"""
+seq is a dictionary that should be provided by the world model 
+
+"""
