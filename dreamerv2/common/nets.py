@@ -314,7 +314,7 @@ class MLP(common.Module):
     return self.get('out', DistLayer, self._shape, **self._out)(x)
 
 
-class GRUCell(tf.keras.layers.AbstractRNNCell): #standard GRU cell
+class GRUCell(tf.keras.layers.AbstractRNNCell): #standard GRU cell - ok :+1
 
   def __init__(self, size, norm=False, act='tanh', update_bias=-1, **kwargs):
     super().__init__()
