@@ -98,9 +98,3 @@ class ActorCritic():
             #update target critic as moving average 
             for target_param, param in zip(self.target_critic.parameters(), self.critic.parameters()):
                 target_param.data.copy_(target_param.data * (1.0 - target_update) + param.data * target_update)
-
-
-"""
-seq is a dictionary that should be provided by the world model 
-
-"""

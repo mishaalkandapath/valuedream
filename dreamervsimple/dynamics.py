@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from collections import OrderedDict
 import utils
+import optree
 """
 The world model consists of an image encoder, a Recurrent State-Space Model
 (RSSM; Hafner et al., 2018) to learn the dynamics, and predictors for the image, reward, and discount
@@ -37,7 +38,7 @@ class Encoder(nn.Module):
     def make_cnn(self):
         o_d = OrderedDict()
         for i, kernel in enumerate(self.cnn_kernels):
-            depth = 2 ** i * self.cnn_depth
+            depth = 2 ** i * self.cnn_depth #no of channels in the output
             if i == 0: in_channels = self.og_channels #channel is at the end here. 
             cnn = nn.Conv2d(in_channels, depth, kernel, stride=2) #no of channgels in the input, no of channels in the output, kernel size
             o_d[f'conv{i}'] = cnn
@@ -131,7 +132,7 @@ class RSSM(nn.Module):
 
         if state is None: state = self.initial(embedding.shape[0]) #means we be starting from scratch state
         post, prior = utils.static_scan(lambda prev, inputs: self.obs_step(prev[0], *inputs), #calle obs_step to get the posteriors and the priors, where prev is the prev)_state
-                                        (swap(action), swap(embedding), swap(is_first)), state * 2)   #here we generate the post and prior 
+                                        (swap(action), swap(embedding), swap(is_first)), (state, state))   #here we generate the post and prior 
         for i in len(post):
             post[i] = swap(post)
             prior[i] = swap(prior)
@@ -157,8 +158,8 @@ class RSSM(nn.Module):
 
     
     def obs_step(self, prev_state, prev_action, embedding, is_first, sample=True): #this is posterior since it gets the image embedding
-        take_everthing_except_first = lambda y: (torch.einsum('b,b...->b...', 1.0 - is_first.astype(x.dtype), x) for x in y)
-        prev_state, prev_action = take_everthing_except_first([prev_state, prev_action])
+        take_everthing_except_first = lambda x: (torch.einsum('b,b...->b...', 1.0 - is_first.astype(x.dtype), x))
+        prev_state, prev_action = optree.tree_map(take_everthing_except_first, [prev_state, prev_action])
 
         _, prior_deter, _ = self.img_step(prev_state, prev_action, sample)
 
@@ -223,7 +224,7 @@ class RSSM(nn.Module):
         lhs, rhs = (prior[2], post[2]) if forward else (post[2], prior[2]) # 2 is where the logits are at
         mix = balance if forward else (1-balance)
 
-        if balance == 0.5:
+        if balance == 0.5: #no balancing, so j do it once and prop grads through
             value = kld(dist(logits=lhs), dist(logits=rhs))
             loss = torch.maximum(value, free).mean()
         else:

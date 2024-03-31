@@ -12,6 +12,7 @@ config = dv2.defaults.update({
     'actor_ent': 3e-3,
     'loss_scales.kl': 1.0,
     'discount': 0.99,
+    "steps": 1e7
 }).parse_flags()
 
 env = gym.make('CrafterReward-v1')  # Or CrafterNoReward-v1
