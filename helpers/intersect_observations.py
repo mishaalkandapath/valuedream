@@ -14,8 +14,9 @@ def generate_random_sequence(num_steps = 4):
 
     obs = env.reset()
     seq = []
+    actions = [3, 3, 3, 3]
     for step in range(num_steps):
-        action = 3 # np.random.randint(1, 5)
+        action = actions[step] # np.random.randint(1, 5)
         obs, reward, done, info = env.step(action)
         seq.append((obs.astype(np.int16), int(action), reward))
     return seq
@@ -28,30 +29,28 @@ def get_intersection_from_sequence(sequence: list, fill_fn = None):
     # crop to just the map
     seq = [(o[:49, :-1, :], a, r) for o,a,r in sequence]
     curr_intersection = seq[0][0]
-    lost_regions = [None]
     # iteratively intersect
-    # l = [(seq[0][0], 'o1')]
+    l = [(seq[0][0], 'o1')]
     for i in range(len(seq)):
         if i == 0: continue  # skip first
         obs, a, r = seq[i]
-        curr_intersection, lost_region = intersect(curr_intersection, obs, a)
+        curr_intersection = intersect(curr_intersection, obs, a)
         curr_intersection = curr_intersection.astype(np.int16)
-        lost_regions.append(lost_region)
-        # l.append((curr_intersection, f'intersection {i+1}'))
-    # l += [(x[0], f'obs{i}') for i, x in enumerate(seq)]
-    # show(l)
+        l.append((curr_intersection, f'intersection {i+1}'))
+    l += [(x[0], f'obs{i}') for i, x in enumerate(seq)]
+    show(l)
         
-    # now fill in the regions that were lost, since some moves can "undo" cropped regions we lost we need to 
+    # TODO now fill in the regions that were lost, since some moves can "undo" cropped regions we lost we need to 
     # see which ones were actually still lost
-    lost_regions = validate_lost_regions(curr_intersection, lost_regions)
-    filled_intersection = one_obs_fill(lost_regions, curr_intersection, seq[0][0])
+    # lost_regions = find_lost_regions(curr_intersection, lost_regions)
+    # filled_intersection = one_obs_fill(lost_regions, curr_intersection, seq[0][0])
     
     # Fill back in the toolbar and righthand column
     original = sequence[0][0].astype(np.int16)
     result = np.concatenate((
             np.concatenate(
                 (
-                    filled_intersection, 
+                    curr_intersection, 
                     original[49:, :-1, :]
                 ), 
                 axis=0
@@ -60,7 +59,7 @@ def get_intersection_from_sequence(sequence: list, fill_fn = None):
         ), 
         axis=1
     )
-    show([(result, 'final')])
+    show([(result, 'final')], ncols=1)
 
 def one_obs_fill(lost_regions, obs, ref_obs):
     """
@@ -104,11 +103,10 @@ def show(matrices, ncols=4):
     plt.tight_layout()
     plt.show()
 
-def intersect(obs1, obs2, action, dead_val = 0):
+def intersect(obs1, obs2, action):
     """
     obs1, obs2: both numpy matrices of the same shape
     action is the action that took obs1 to obs2
-    dead_val: val to put at pixels where intersection fails
     returns the intersection
     """
     shift = 7
@@ -116,22 +114,22 @@ def intersect(obs1, obs2, action, dead_val = 0):
     rows, cols, channels = obs1.shape[0], obs1.shape[1], obs1.shape[2]
     if action == 1:
         lost_shape = (rows, shift, channels)
-        lost_indices = ((0,rows),(cols - shift, cols), (0, channels))
-        return np.concatenate((np.zeros(lost_shape) + dead_val, obs1[:, :-shift, :]), axis=1), lost_indices
+        cropped_obs = np.concatenate((np.zeros(lost_shape), obs1[:, :-shift, :]), axis=1)
+        return np.where(abs(cropped_obs - obs2) < thresh, obs2, 0)
     elif action == 2:
         lost_shape = (rows, shift, channels)
-        lost_indices = ((0,rows),(0, cols), (0, channels))
-        return np.concatenate((obs1[:, shift:, :], np.zeros(lost_shape) + dead_val), axis=1), lost_indices
+        cropped_obs = np.concatenate((obs1[:, shift:, :], np.zeros(lost_shape)), axis=1)
+        return np.where(abs(cropped_obs - obs2) < thresh, obs2, 0)
     elif action == 3:
         lost_shape = (shift, cols, channels)
-        lost_indices = ((rows - shift,rows),(0, cols), (0, channels))
-        return np.concatenate((np.zeros(lost_shape) + dead_val, obs1[:-shift, :, :]), axis=0), lost_indices
+        cropped_obs = np.concatenate((np.zeros(lost_shape), obs1[:-shift, :, :]), axis=0)
+        return np.where(abs(cropped_obs - obs2) < thresh, obs2, 0)
     elif action == 4:
         lost_shape = (shift, cols, channels)
-        lost_indices = ((0, shift),(0, cols), (0, channels))
-        return np.concatenate((obs1[shift:, :, :], np.zeros(lost_shape) + dead_val), axis=0), lost_indices
+        cropped_obs = np.concatenate((obs1[shift:, :, :], np.zeros(lost_shape)), axis=0)
+        return np.where(abs(cropped_obs - obs2) < thresh, obs2, 0)
     else:
-        return np.where(abs(obs1 - obs2) < thresh, obs1, 0) , None
+        return np.where(abs(obs1 - obs2) < thresh, obs1, 0)
    
 def validate_lost_regions(obs, lost_regions):
     rows, cols = obs.shape[0], obs.shape[1]
