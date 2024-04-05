@@ -107,10 +107,10 @@ def train(env, config, outputs=None):
   else:
     print('Pretrain agent.')
     for _ in range(config.pretrain):
-      train_agent(next(dataset))
+      train_agent(next(dataset)) #basically, given observation and some start state, do one step prediction + loss calculation
   policy = lambda *args: agnt.policy(
       *args, mode='explore' if should_expl(step) else 'train')
-
+  #train each step basically
   def train_step(tran, worker):
     if should_train(step):
       for _ in range(config.train_steps):

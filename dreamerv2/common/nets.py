@@ -33,7 +33,9 @@ class EnsembleRSSM(common.Module):
       state = dict( #self.discrete coz for a discrete probability distribution
           logit=tf.zeros([batch_size, self._stoch, self._discrete], dtype), #probability of the values of the stoch state values
           stoch=tf.zeros([batch_size, self._stoch, self._discrete], dtype), # stochastic state
-          deter=self._cell.get_initial_state(None, batch_size, dtype))#deterministic state
+          deter=self._cell.get_initial_state(None, batch_size, dtype))#deterministic state, big fat many zeroes
+
+          #a stochastic state is characterized by some parameters (the number being self._stoch). each parameter can take a discrete valued vector of dimension self._discrete.
     else:
       state = dict(
           mean=tf.zeros([batch_size, self._stoch], dtype), #similarly mean and variance. 
@@ -44,6 +46,7 @@ class EnsembleRSSM(common.Module):
 
   @tf.function
   def observe(self, embed, action, is_first, state=None):
+    print("At observe we have shapes {}".format([action.shape, embed.shape, is_first.shape]))
     swap = lambda x: tf.transpose(x, [1, 0] + list(range(2, len(x.shape))))
     if state is None:
       state = self.initial(tf.shape(action)[0])
@@ -87,7 +90,7 @@ class EnsembleRSSM(common.Module):
     return dist
 
   @tf.function
-  def obs_step(self, prev_state, prev_action, embed, is_first, sample=True):
+  def obs_step(self, prev_state, prev_action, embed, is_first, sample=True): # the representation model
     # if is_first.any():
     prev_state, prev_action = tf.nest.map_structure(
         lambda x: tf.einsum(
@@ -105,7 +108,7 @@ class EnsembleRSSM(common.Module):
     return post, prior
 
   @tf.function
-  def img_step(self, prev_state, prev_action, sample=True):
+  def img_step(self, prev_state, prev_action, sample=True): # the transition model 
     prev_stoch = self._cast(prev_state['stoch'])
     prev_action = self._cast(prev_action)
     if self._discrete:
@@ -202,6 +205,7 @@ class Encoder(common.Module):
   def __call__(self, data):
     key, shape = list(self.shapes.items())[0]
     batch_dims = data[key].shape[:-len(shape)]
+    print("Encoder call we have shape {} with batch_dims = {}".format(data[key].shape, batch_dims))
     data = {
         k: tf.reshape(v, (-1,) + tuple(v.shape)[len(batch_dims):])
         for k, v in data.items()}
@@ -215,13 +219,13 @@ class Encoder(common.Module):
 
   def _cnn(self, data):
     x = tf.concat(list(data.values()), -1)
-    x = x.astype(prec.global_policy().compute_dtype)
+    x = x.astype(prec.global_policy().compute_dtype) # of shape (batch, 64, 64, 3) for crafter as expected, with batch 800
     for i, kernel in enumerate(self._cnn_kernels):
       depth = 2 ** i * self._cnn_depth
       x = self.get(f'conv{i}', tfkl.Conv2D, depth, kernel, 2)(x)
       x = self.get(f'convnorm{i}', NormLayer, self._norm)(x)
       x = self._act(x)
-    return x.reshape(tuple(x.shape[:-3]) + (-1,))
+    return x.reshape(tuple(x.shape[:-3]) + (-1,)) #before reshaping: (800, 2, 2, 384), after : 800, 1536 so encoder dimensionality for crafter is 1536
 
   def _mlp(self, data):
     x = tf.concat(list(data.values()), -1)

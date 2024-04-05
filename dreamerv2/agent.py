@@ -24,19 +24,29 @@ class Agent(common.Module):
 
   @tf.function
   def policy(self, obs, state=None, mode='train'):
+    """
+    Given an observation and prev_state (a tuple w the prev stochastic state and prev action), embed the observation.
+    Then use the embedding, action, and stochastic state to get the next stochastic state+deterministic state representation. 
+    Use these features to sample the next action. 
+    After you get 
+    return the action and the new state
+    """
+    print("---At Policy--")
+    print("Is state none? {}".format(state is None))
+    print("Obs shape we have is: {}".format(obs['image'].shape))
     obs = tf.nest.map_structure(tf.tensor, obs)
     tf.py_function(lambda: self.tfstep.assign(
         int(self.step), read_value=False), [], [])
     if state is None:
       latent = self.wm.rssm.initial(len(obs['reward']))
-      action = tf.zeros((len(obs['reward']),) + self.act_space.shape)
+      action = tf.zeros((len(obs['reward']),) + self.act_space.shape) # generate the zero action giving shape batchxaction_space: (b, 17)
       state = latent, action
     latent, action = state
-    embed = self.wm.encoder(self.wm.preprocess(obs))
+    embed = self.wm.encoder(self.wm.preprocess(obs)) #preprocessing just make a reward clipping function, and initializes the discount factors with 0 for terminal states
     sample = (mode == 'train') or not self.config.eval_state_mean
     latent, _ = self.wm.rssm.obs_step(
-        latent, action, embed, obs['is_first'], sample)
-    feat = self.wm.rssm.get_feat(latent)
+        latent, action, embed, obs['is_first'], sample) # get the posteriors
+    feat = self.wm.rssm.get_feat(latent) # a concatenation of the stochastic and determinisitc state
     if mode == 'eval':
       actor = self._task_behavior.actor(feat)
       action = actor.mode()
@@ -57,12 +67,12 @@ class Agent(common.Module):
   @tf.function
   def train(self, data, state=None):
     metrics = {}
-    state, outputs, mets = self.wm.train(data, state)
+    state, outputs, mets = self.wm.train(data, state) #one- step prediction given the current observatiion and states
     metrics.update(mets)
     start = outputs['post']
     reward = lambda seq: self.wm.heads['reward'](seq['feat']).mode()
     metrics.update(self._task_behavior.train(
-        self.wm, start, data['is_terminal'], reward))
+        self.wm, start, data['is_terminal'], reward)) # train the actor-critic model
     if self.config.expl_behavior != 'greedy':
       mets = self._expl_behavior.train(start, outputs, data)[-1]
       metrics.update({'expl_' + key: value for key, value in mets.items()})
@@ -107,7 +117,7 @@ class WorldModel(common.Module):
     embed = self.encoder(data)
     post, prior = self.rssm.observe(
         embed, data['action'], data['is_first'], state)
-    kl_loss, kl_value = self.rssm.kl_loss(post, prior, **self.config.kl)
+    kl_loss, kl_value = self.rssm.kl_loss(post, prior, **self.config.kl) # kl loss between post and prior
     assert len(kl_loss.shape) == 0
     likes = {}
     losses = {'kl': kl_loss}
@@ -117,7 +127,7 @@ class WorldModel(common.Module):
       inp = feat if grad_head else tf.stop_gradient(feat)
       out = head(inp)
       dists = out if isinstance(out, dict) else {name: out}
-      for key, dist in dists.items():
+      for key, dist in dists.items(): #loss on the log probability of the true vakue being observed under the predicted distribution for all the heads
         like = tf.cast(dist.log_prob(data[key]), tf.float32)
         likes[key] = like
         losses[key] = -like.mean()
@@ -133,18 +143,21 @@ class WorldModel(common.Module):
     last_state = {k: v[:, -1] for k, v in post.items()}
     return model_loss, last_state, outs, metrics
 
-  def imagine(self, policy, start, is_terminal, horizon):
-    flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
-    start = {k: flatten(v) for k, v in start.items()}
+  def imagine(self, policy, start, is_terminal, horizon): # start is basically the posterior state, it has its logits, stoch and det vectors
+    # print("---At Imagine--")
+    # print("In start: {}".format(list(start[key].shape for key in start))) 
+    #Initially start vectors are of shape 16, 50, 32, 32
+    flatten = lambda x: x.reshape([-1] + list(x.shape[2:])) # flatten the time dimensions
+    start = {k: flatten(v) for k, v in start.items()} # now of shape 800, 32, 32
     start['feat'] = self.rssm.get_feat(start)
     start['action'] = tf.zeros_like(policy(start['feat']).mode())
     seq = {k: [v] for k, v in start.items()}
     for _ in range(horizon):
       action = policy(tf.stop_gradient(seq['feat'][-1])).sample()
-      state = self.rssm.img_step({k: v[-1] for k, v in seq.items()}, action)
+      state = self.rssm.img_step({k: v[-1] for k, v in seq.items()}, action) # get a prior from the last state in the sequence so far and the action
       feat = self.rssm.get_feat(state)
       for key, value in {**state, 'action': action, 'feat': feat}.items():
-        seq[key].append(value)
+        seq[key].append(value) # grow the sequence
     seq = {k: tf.stack(v, 0) for k, v in seq.items()}
     if 'discount' in self.heads:
       disc = self.heads['discount'](seq['feat']).mean()
@@ -235,14 +248,14 @@ class ActorCritic(common.Module):
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
     with tf.GradientTape() as actor_tape:
-      seq = world_model.imagine(self.actor, start, is_terminal, hor)
+      seq = world_model.imagine(self.actor, start, is_terminal, hor) # generate an imagined trajectory upto horizon H 
       reward = reward_fn(seq)
       seq['reward'], mets1 = self.rewnorm(reward)
       mets1 = {f'reward_{k}': v for k, v in mets1.items()}
       target, mets2 = self.target(seq)
-      actor_loss, mets3 = self.actor_loss(seq, target)
+      actor_loss, mets3 = self.actor_loss(seq, target) # train the actor here based on teh value predictions from the target
     with tf.GradientTape() as critic_tape:
-      critic_loss, mets4 = self.critic_loss(seq, target)
+      critic_loss, mets4 = self.critic_loss(seq, target) # train the critic
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
     metrics.update(**mets1, **mets2, **mets3, **mets4)
