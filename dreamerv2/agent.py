@@ -31,9 +31,9 @@ class Agent(common.Module):
     After you get 
     return the action and the new state
     """
-    print("---At Policy--")
-    print("Is state none? {}".format(state is None))
-    print("Obs shape we have is: {}".format(obs['image'].shape))
+    # print("---At Policy--")
+    # print("Is state none? {}".format(state is None))
+    # print("Obs shape we have is: {}".format(obs['image'].shape))
     obs = tf.nest.map_structure(tf.tensor, obs)
     tf.py_function(lambda: self.tfstep.assign(
         int(self.step), read_value=False), [], [])
@@ -97,7 +97,7 @@ class WorldModel(common.Module):
     self.rssm = common.EnsembleRSSM(**config.rssm)
     self.encoder = common.Encoder(shapes, **config.encoder)
     self.heads = {}
-    self.heads['decoder'] = common.Decoder(shapes, **config.decoder)
+    self.heads['decoder'] = common.RecurrentDecoder(shapes, **config.decoder)#common.Decoder(shapes, **config.decoder)
     self.heads['reward'] = common.MLP([], **config.reward_head)
     if config.pred_discount:
       self.heads['discount'] = common.MLP([], **config.discount_head)
@@ -112,23 +112,38 @@ class WorldModel(common.Module):
     metrics.update(self.model_opt(model_tape, model_loss, modules))
     return state, outputs, metrics
 
+  def multi_step_helper(self, data):
+    #convert the matrix into what we want:
+    swap = lambda x: tf.transpose(x, [1, 0] + list(range(2, len(x.shape))))
+    images = data["image"]
+    images = swap(images)
+    new_images = tf.concat([images[i:, :] for i in range(0, 5)], 0)
+    return swap(new_images)    
+
   def loss(self, data, state=None):
     data = self.preprocess(data)
     embed = self.encoder(data)
+    # print("state is none? {}".format(state is None))
+    # print("but we have data of shape {}".format(data["image"].shape))  
     post, prior = self.rssm.observe(
         embed, data['action'], data['is_first'], state)
+  
     kl_loss, kl_value = self.rssm.kl_loss(post, prior, **self.config.kl) # kl loss between post and prior
     assert len(kl_loss.shape) == 0
     likes = {}
     losses = {'kl': kl_loss}
     feat = self.rssm.get_feat(post)
     for name, head in self.heads.items():
+      # print("heyy ", name)
       grad_head = (name in self.config.grad_heads)
       inp = feat if grad_head else tf.stop_gradient(feat)
-      out = head(inp)
+      out = head(inp, data["action"]) if name == "decoder" else head(inp)
       dists = out if isinstance(out, dict) else {name: out}
+      # print("for head {} we have {} ".format(name, list(dists.keys())))
       for key, dist in dists.items(): #loss on the log probability of the true vakue being observed under the predicted distribution for all the heads
-        like = tf.cast(dist.log_prob(data[key]), tf.float32)
+        if name == "decoder":
+          like = tf.cast(dist.log_prob(self.multi_step_helper(data)), tf.float32)
+        else: like = tf.cast(dist.log_prob(data[key]), tf.float32)
         likes[key] = like
         losses[key] = -like.mean()
     model_loss = sum(

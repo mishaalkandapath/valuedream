@@ -7,6 +7,7 @@ from tensorflow_probability import distributions as tfd
 from tensorflow.keras.mixed_precision import experimental as prec
 
 import common
+from collections import defaultdict
 
 
 class EnsembleRSSM(common.Module):
@@ -46,7 +47,7 @@ class EnsembleRSSM(common.Module):
 
   @tf.function
   def observe(self, embed, action, is_first, state=None):
-    print("At observe we have shapes {}".format([action.shape, embed.shape, is_first.shape]))
+    # print("At observe we have shapes {}".format([action.shape, embed.shape, is_first.shape]))
     swap = lambda x: tf.transpose(x, [1, 0] + list(range(2, len(x.shape))))
     if state is None:
       state = self.initial(tf.shape(action)[0])
@@ -205,7 +206,7 @@ class Encoder(common.Module):
   def __call__(self, data):
     key, shape = list(self.shapes.items())[0]
     batch_dims = data[key].shape[:-len(shape)]
-    print("Encoder call we have shape {} with batch_dims = {}".format(data[key].shape, batch_dims))
+    # print("Encoder call we have shape {} with batch_dims = {}".format(data[key].shape, batch_dims))
     data = {
         k: tf.reshape(v, (-1,) + tuple(v.shape)[len(batch_dims):])
         for k, v in data.items()}
@@ -236,13 +237,56 @@ class Encoder(common.Module):
       x = self._act(x)
     return x
 
+class RecurrentDecoder(common.Module):
+  def __init__(self, shapes, cnn_keys=r'.*', mlp_keys=r'.*', act='elu', norm='none', cnn_depth=48, cnn_kernels=(4, 4, 4, 4), mlp_layers=[400, 400, 400, 400]):
+    #this guy basically takes in a code vector + hidden_state + curr action and produces the image that should come next. 
+    #action noop (no-op, action code 0) is bascially for predicting the current image
+    self.decoder = Decoder(shapes, cnn_keys, mlp_keys, act, norm, cnn_depth, cnn_kernels, mlp_layers)
+    self._act = get_act(act)
+    self._norm = norm
+    self._cell = GRUCell(2048, norm=True) # it is the concatenation of the stochastic and determinisitic state TODO: Replace with variable
+
+  def __call__(self, code_vec, actions):
+    #actions is a normal matrix of size 16, 50, 17. for each index, it is just that we need to consider actions form i to i+4
+    
+    #swap to have time dimension at the first and batch at the rest for parallelism
+    swap = lambda x: tf.transpose(x, [1, 0] + list(range(2, len(x.shape))))
+
+    #swap them 
+    code_vec = swap(code_vec)
+    actions = swap(actions)
+    #cast vectors
+    code_vec = tf.cast(code_vec, tf.float32)
+    actions = tf.cast(actions, tf.float32)
+
+    indices = actions.shape[0]
+
+    levels = defaultdict(lambda: [])
+    for idx in range(indices):
+      #for each time step we need to run this atmost 4 times
+      hidden = self._cell.get_initial_state(None, code_vec.shape[1], tf.float32) # restart hidden state for each run
+      for i in range(5):
+        if i >= indices - idx: continue
+        code = code_vec[idx]
+        action = actions[idx+i] # run the next action code
+        hidden = self._cell(tf.concat([code, action], -1), [hidden])
+        hidden = hidden[0]
+        #run the decoder
+        outputs = self.decoder._cnn(hidden)
+        levels[i].append(outputs)
+    
+    outputs = tf.concat([tf.stack(levels[l], 0) for l in levels], axis=0)
+    # print("recurrent dcoder shape is ", outputs.shape)
+    return {"image": 
+            tfd.Independent(tfd.Normal(swap(outputs), 1), 3) } # of shape 16, 240, 64, 64, 3
 
 class Decoder(common.Module):
 
   def __init__(
       self, shapes, cnn_keys=r'.*', mlp_keys=r'.*', act='elu', norm='none',
-      cnn_depth=48, cnn_kernels=(4, 4, 4, 4), mlp_layers=[400, 400, 400, 400]):
+      cnn_depth=48, cnn_kernels=(4, 4, 4, 4), mlp_layers=[400, 400, 400, 400], custom=True):
     self._shapes = shapes
+    # print("shapes in decoder: {}".format(shapes))
     self.cnn_keys = [
         k for k, v in shapes.items() if re.match(cnn_keys, k) and len(v) == 3]
     self.mlp_keys = [
@@ -254,6 +298,7 @@ class Decoder(common.Module):
     self._cnn_depth = cnn_depth
     self._cnn_kernels = cnn_kernels
     self._mlp_layers = mlp_layers
+    self._custom = custom
 
   def __call__(self, features):
     features = tf.cast(features, prec.global_policy().compute_dtype)
@@ -265,6 +310,7 @@ class Decoder(common.Module):
     return outputs
 
   def _cnn(self, features):
+    # print("in decoder we have features of shape {}".format(features.shape))
     channels = {k: self._shapes[k][-1] for k in self.cnn_keys}
     ConvT = tfkl.Conv2DTranspose
     x = self.get('convin', tfkl.Dense, 32 * self._cnn_depth)(features)
@@ -279,6 +325,9 @@ class Decoder(common.Module):
       x = act(x)
     x = x.reshape(features.shape[:-1] + x.shape[1:])
     means = tf.split(x, list(channels.values()), -1)
+    # print("decoder output shape is {}".format(x.shape))
+    if self._custom:
+      return means[0]
     dists = {
         key: tfd.Independent(tfd.Normal(mean, 1), 3)
         for (key, shape), mean in zip(channels.items(), means)}

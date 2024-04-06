@@ -5,7 +5,7 @@ import crafter
 import dreamerv2.api as dv2
 
 config = dv2.defaults.update({
-    'logdir': '~/logdir/crafter2',
+    'logdir': '~/logdir/crafter_multi_step',
     'log_every': 1e3,
     'train_every': 10,
     'prefill': 1e5,

@@ -36,14 +36,14 @@ def static_scan(fn, inputs, start, reverse=False):
   indices = range(tf.nest.flatten(inputs)[0].shape[0])
   if reverse:
     indices = reversed(indices)
-  for index in indices:
-    inp = tf.nest.map_structure(lambda x: x[index], inputs)
-    last = fn(last, inp)
-    [o.append(l) for o, l in zip(outputs, tf.nest.flatten(last))]
+  for index in indices: # loop over the time indices
+    inp = tf.nest.map_structure(lambda x: x[index], inputs) # get the current time index for each of the batch 
+    last = fn(last, inp) # run and save the returned state, we need to use this for the next time step
+    [o.append(l) for o, l in zip(outputs, tf.nest.flatten(last))] #get the post and priors concatenated
   if reverse:
     outputs = [list(reversed(x)) for x in outputs]
   outputs = [tf.stack(x, 0) for x in outputs]
-  return tf.nest.pack_sequence_as(start, outputs)
+  return tf.nest.pack_sequence_as(start, outputs) #return as post, priors
 
 
 def schedule(string, step):
