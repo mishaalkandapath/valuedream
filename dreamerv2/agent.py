@@ -114,9 +114,12 @@ class WorldModel(common.Module):
 
   def multi_step_helper(self, data):
     #convert the matrix into what we want:
+    # just swap the first two indices
     swap = lambda x: tf.transpose(x, [1, 0] + list(range(2, len(x.shape))))
     images = data["image"]
     images = swap(images)
+    # concatenate to get the following: the entire image sequence, 
+    #             the entire image sequence except for the first, the entire image sequence except for first two...
     new_images = tf.concat([images[i:, :] for i in range(0, 5)], 0)
     return swap(new_images)    
 
