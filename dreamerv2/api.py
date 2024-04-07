@@ -102,6 +102,7 @@ def train(env, config, outputs=None):
   dataset = iter(replay.dataset(**config.dataset))
   train_agent = common.CarryOverState(agnt.train)
   train_agent(next(dataset))
+  # print("DONE INIT TRAINING")
   if (logdir / 'variables.pkl').exists():
     agnt.load(logdir / 'variables.pkl')
   else:
