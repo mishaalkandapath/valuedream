@@ -107,6 +107,11 @@ class Optimizer(tf.Module):
     if self._once:
       print(f'Found {count} {self._name} parameters.')
       self._once = False
+      #print all the layers in each named module along with the parameters per
+      # for module in modules:
+      #   print(f'{module.__class__.__name__}:')
+      #   for var in module.variables:
+      #     print(f'  {var.name} {var.shape}')
 
     # Check loss.
     tf.debugging.check_numerics(loss, self._name + '_loss') # shudnt be nan or inf or something

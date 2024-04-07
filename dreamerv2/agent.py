@@ -4,7 +4,6 @@ from tensorflow.keras import mixed_precision as prec
 import common
 import expl
 
-
 class Agent(common.Module):
 
   def __init__(self, config, obs_space, act_space, step):
@@ -66,6 +65,7 @@ class Agent(common.Module):
 
   @tf.function
   def train(self, data, state=None):
+    # tf.print("Graph execution")
     metrics = {}
     state, outputs, mets = self.wm.train(data, state) #one- step prediction given the current observatiion and states
     metrics.update(mets)
@@ -76,6 +76,7 @@ class Agent(common.Module):
     if self.config.expl_behavior != 'greedy':
       mets = self._expl_behavior.train(start, outputs, data)[-1]
       metrics.update({'expl_' + key: value for key, value in mets.items()})
+    # print("DONE TRAINING A2C")
     return state, metrics
 
   @tf.function
@@ -92,12 +93,13 @@ class WorldModel(common.Module):
 
   def __init__(self, config, obs_space, tfstep):
     shapes = {k: tuple(v.shape) for k, v in obs_space.items()}
+    self._changed = False
     self.config = config
     self.tfstep = tfstep
     self.rssm = common.EnsembleRSSM(**config.rssm)
     self.encoder = common.Encoder(shapes, **config.encoder)
     self.heads = {}
-    self.heads['decoder'] = common.RecurrentDecoder(shapes, **config.decoder)#common.Decoder(shapes, **config.decoder)
+    self.heads['decoder'] = common.RecurrentDecoder(shapes, **config.decoder) if self._changed else common.Decoder(shapes, **config.decoder)
     self.heads['reward'] = common.MLP([], **config.reward_head)
     if config.pred_discount:
       self.heads['discount'] = common.MLP([], **config.discount_head)
@@ -108,8 +110,10 @@ class WorldModel(common.Module):
   def train(self, data, state=None):
     with tf.GradientTape() as model_tape:
       model_loss, state, outputs, metrics = self.loss(data, state)
+    # print("DONE INFERENCE PART")
     modules = [self.encoder, self.rssm, *self.heads.values()]
     metrics.update(self.model_opt(model_tape, model_loss, modules))
+    # print("DONE UPDATE")
     return state, outputs, metrics
 
   def multi_step_helper(self, data):
@@ -121,13 +125,16 @@ class WorldModel(common.Module):
     return swap(new_images)    
 
   def loss(self, data, state=None):
+    # print("At Loss, data shape: {} {}".format(data["image"].shape, data["action"].shape))
+    # with tf.Session() as sess: print("the first few actions are {}".format(data["action"][0, 0:3].eval())) 
     data = self.preprocess(data)
     embed = self.encoder(data)
+    # print("PROCESSED WITH ENCODER")
     # print("state is none? {}".format(state is None))
     # print("but we have data of shape {}".format(data["image"].shape))  
     post, prior = self.rssm.observe(
         embed, data['action'], data['is_first'], state)
-  
+    # print("DONE OBSERVING")
     kl_loss, kl_value = self.rssm.kl_loss(post, prior, **self.config.kl) # kl loss between post and prior
     assert len(kl_loss.shape) == 0
     likes = {}
@@ -137,15 +144,17 @@ class WorldModel(common.Module):
       # print("heyy ", name)
       grad_head = (name in self.config.grad_heads)
       inp = feat if grad_head else tf.stop_gradient(feat)
-      out = head(inp, data["action"]) if name == "decoder" else head(inp)
+      out = head(inp, data["action"]) if name == "decoder" and self._changed else head(inp)
+      # print("DONE HEAD {}".format(name))
       dists = out if isinstance(out, dict) else {name: out}
       # print("for head {} we have {} ".format(name, list(dists.keys())))
       for key, dist in dists.items(): #loss on the log probability of the true vakue being observed under the predicted distribution for all the heads
-        if name == "decoder":
+        if name == "decoder" and self._changed:
           like = tf.cast(dist.log_prob(self.multi_step_helper(data)), tf.float32)
         else: like = tf.cast(dist.log_prob(data[key]), tf.float32)
         likes[key] = like
         losses[key] = -like.mean()
+      # print("DONE LOSS {}".format(name))
     model_loss = sum(
         self.config.loss_scales.get(k, 1.0) * v for k, v in losses.items())
     outs = dict(
@@ -219,10 +228,10 @@ class WorldModel(common.Module):
     embed = self.encoder(data)
     states, _ = self.rssm.observe(
         embed[:6, :5], data['action'][:6, :5], data['is_first'][:6, :5])
-    recon = decoder(self.rssm.get_feat(states))[key].mode()[:6]
+    recon = decoder(self.rssm.get_feat(states))[key].mode()[:6] if not self._changed else decoder(self.rssm.get_feat(states), data['action'][:6, :5], hor=1)[key].mode()[:6]
     init = {k: v[:, -1] for k, v in states.items()}
     prior = self.rssm.imagine(data['action'][:6, 5:], init)
-    openl = decoder(self.rssm.get_feat(prior))[key].mode()
+    openl = decoder(self.rssm.get_feat(prior))[key].mode() if not self._changed else decoder(self.rssm.get_feat(prior), data['action'][:6, 5:], hor=1)[key].mode()
     model = tf.concat([recon[:, :5] + 0.5, openl + 0.5], 1)
     error = (model - truth + 1) / 2
     video = tf.concat([truth, model, error], 2)
