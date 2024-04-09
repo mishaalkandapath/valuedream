@@ -35,6 +35,7 @@ def main():
       pathlib.Path(sys.argv[0]).parent / 'configs.yaml').read_text())
   parsed, remaining = common.Flags(configs=['defaults']).parse(known_only=True)
   config = common.Config(configs['defaults'])
+  config = config.update(configs['crafter'])
   for name in parsed.configs:
     config = config.update(configs[name])
   config = common.Flags(config).parse(remaining)
@@ -77,6 +78,7 @@ def main():
   should_expl = common.Until(config.expl_until // config.action_repeat)
 
   def make_env(mode):
+    print(config.task)
     suite, task = config.task.split('_', 1)
     if suite == 'dmc':
       env = common.DMC(

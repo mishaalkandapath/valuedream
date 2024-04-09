@@ -141,7 +141,7 @@ class WorldModel(common.Module):
     seq = {k: [v] for k, v in start.items()}
     for _ in range(horizon):
       action = policy(tf.stop_gradient(seq['feat'][-1])).sample()
-      state = self.rssm.img_step({k: v[-1] for k, v in seq.items()}, action)
+      state = self.rssm.imgtep({k: v[-1] for k, v in seq.items()}, action)
       feat = self.rssm.get_feat(state)
       for key, value in {**state, 'action': action, 'feat': feat}.items():
         seq[key].append(value)
@@ -290,6 +290,8 @@ class ActorCritic(common.Module):
     metrics['actor_ent_scale'] = ent_scale
     return actor_loss, metrics
 
+  #OUR MODIFICATIONS
+  #Value propgation attempt
   def critic_loss(self, seq, target):
     # States:     [z0]  [z1]  [z2]   z3
     # Rewards:    [r0]  [r1]  [r2]   r3
@@ -299,7 +301,16 @@ class ActorCritic(common.Module):
     # Loss:        l0    l1    l2
     dist = self.critic(seq['feat'][:-1])
     target = tf.stop_gradient(target)
-    weight = tf.stop_gradient(seq['weight'])
+    
+    #Modifications here-----------------
+    if self.config.prop_value_every > 0:
+      if self.tfstep % prop_value_every == 0:
+        weight=seq['weight']
+      else:
+        weight = tf.stop_gradient(seq['weight'])
+
+    #weight = tf.stop_gradient(seq['weight']) OLD version
+    #-------------------
     critic_loss = -(dist.log_prob(target) * weight[:-1]).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
