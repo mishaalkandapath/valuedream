@@ -247,8 +247,7 @@ class ActorCritic(common.Module):
     w1 = seq['weight']
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
     w2 = seq['weight']
-    tf.print('w1:', w1)
-    tf.print('w2:', w2)
+    tf.print(tf.reduce_all(tf.equal(w1, w2)))
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.
     return metrics
@@ -288,7 +287,8 @@ class ActorCritic(common.Module):
     ent = policy.entropy()
     ent_scale = common.schedule(self.config.actor_ent, self.tfstep)
     objective += ent_scale * ent
-    weight = tf.stop_gradient(seq['weight'])
+    # weight = tf.stop_gradient(seq['weight'])
+    weight = seq['weight']
     actor_loss = -(weight[:-2] * objective).mean()
     metrics['actor_ent'] = ent.mean()
     metrics['actor_ent_scale'] = ent_scale
