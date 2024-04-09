@@ -244,7 +244,11 @@ class ActorCritic(common.Module):
     with tf.GradientTape() as critic_tape:
       critic_loss, mets4 = self.critic_loss(seq, target)
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
+    w1 = seq['weight']
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
+    w2 = seq['weight']
+    tf.print('w1:', w1)
+    tf.print('w2:', w2)
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.
     return metrics
@@ -299,7 +303,18 @@ class ActorCritic(common.Module):
     # Loss:        l0    l1    l2
     dist = self.critic(seq['feat'][:-1])
     target = tf.stop_gradient(target)
-    weight = tf.stop_gradient(seq['weight'])
+
+    # --- modifications ---
+    # if self.config.prop_value_every is not None:
+    #   if self.tfstep % self.config.prop_value_every == 0:
+    #     weight = seq['weight']
+    #   else:
+    #     weight = tf.stop_gradient(seq['weight'])
+    
+    weight = seq['weight']
+    # weight = tf.stop_gradient(seq['weight'])
+    # --- ------------- ---
+
     critic_loss = -(dist.log_prob(target) * weight[:-1]).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
