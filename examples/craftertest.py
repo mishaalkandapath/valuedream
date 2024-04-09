@@ -6,7 +6,7 @@ import dreamerv2.api as dv2
 import tensorflow as tf
 
 config = dv2.defaults.update({
-    'logdir': '~/logdir/crafter_normal',
+    'logdir': '~/logdir/crafter_multi_step',
     'log_every': 1e3,
     'train_every': 10,
     'prefill': 1e5,
@@ -27,7 +27,7 @@ env = crafter.Recorder(
 gpus = tf.config.list_physical_devices('GPU')
 # for gpu in gpus:
 #       tf.config.experimental.set_memory_growth(gpu, True)
-tf.config.set_visible_devices(gpus[1], "GPU")
+tf.config.set_visible_devices(gpus[:2], "GPU")
 
 dv2.train(env, config)
 

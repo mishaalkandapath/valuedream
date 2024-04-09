@@ -128,4 +128,5 @@ def train(env, config, outputs=None):
   while step < config.steps:
     logger.write()
     driver(policy, steps=config.eval_every)
+    print("Checkpointing....")
     agnt.save(logdir / 'variables.pkl')
