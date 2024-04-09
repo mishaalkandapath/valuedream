@@ -241,15 +241,16 @@ class ActorCritic(common.Module):
       mets1 = {f'reward_{k}': v for k, v in mets1.items()}
       target, mets2 = self.target(seq)
       actor_loss, mets3 = self.actor_loss(seq, target)
+    w1 = seq['weight']
     with tf.GradientTape() as critic_tape:
       critic_loss, mets4 = self.critic_loss(seq, target)
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
-    w1 = seq['weight']
+    
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
-    w2 = seq['weight']
-    tf.print(tf.reduce_all(tf.equal(w1, w2)))
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.
+    w2 = seq['weight']
+    tf.print(tf.reduce_all(tf.equal(w1, w2)))
     return metrics
 
   def actor_loss(self, seq, target):
@@ -287,8 +288,7 @@ class ActorCritic(common.Module):
     ent = policy.entropy()
     ent_scale = common.schedule(self.config.actor_ent, self.tfstep)
     objective += ent_scale * ent
-    # weight = tf.stop_gradient(seq['weight'])
-    weight = seq['weight']
+    weight = tf.stop_gradient(seq['weight'])
     actor_loss = -(weight[:-2] * objective).mean()
     metrics['actor_ent'] = ent.mean()
     metrics['actor_ent_scale'] = ent_scale
