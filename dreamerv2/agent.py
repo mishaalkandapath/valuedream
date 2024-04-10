@@ -93,7 +93,7 @@ class WorldModel(common.Module):
 
   def __init__(self, config, obs_space, tfstep):
     shapes = {k: tuple(v.shape) for k, v in obs_space.items()}
-    self._changed = True
+    self._changed = False
     self.config = config
     self.tfstep = tfstep
     self.rssm = common.EnsembleRSSM(**config.rssm)
