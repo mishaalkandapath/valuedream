@@ -234,23 +234,26 @@ class ActorCritic(common.Module):
     # step onwards, which is the first imagined step. However, we are not
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
-    with tf.GradientTape() as actor_tape:
+    
+    with tf.GradientTape() as critic_tape:
       seq = world_model.imagine(self.actor, start, is_terminal, hor)
       reward = reward_fn(seq)
       seq['reward'], mets1 = self.rewnorm(reward)
       mets1 = {f'reward_{k}': v for k, v in mets1.items()}
       target, mets2 = self.target(seq)
-      actor_loss, mets3 = self.actor_loss(seq, target)
-    w1 = seq['weight']
-    with tf.GradientTape() as critic_tape:
+      w1 = seq['weight']
       critic_loss, mets4 = self.critic_loss(seq, target)
+
+    with tf.GradientTape() as actor_tape:
+      actor_loss, mets3 = self.actor_loss(seq, target)
+
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
-    
-    metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
-    metrics.update(**mets1, **mets2, **mets3, **mets4)
-    self.update_slow_target()  # Variables exist after first forward pass.
+    metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model]))
     w2 = seq['weight']
     tf.print(tf.reduce_all(tf.equal(w1, w2)))
+    
+    metrics.update(**mets1, **mets2, **mets3, **mets4)
+    self.update_slow_target()  # Variables exist after first forward pass.
     return metrics
 
   def actor_loss(self, seq, target):
