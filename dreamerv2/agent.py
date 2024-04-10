@@ -61,11 +61,14 @@ class Agent(common.Module):
     metrics.update(mets)
     start = outputs['post']
     reward = lambda seq: self.wm.heads['reward'](seq['feat']).mode()
+    w1 = self._task_behavior.critic.variables
     metrics.update(self._task_behavior.train(
         self.wm, start, data['is_terminal'], reward))
     if self.config.expl_behavior != 'greedy':
       mets = self._expl_behavior.train(start, outputs, data)[-1]
       metrics.update({'expl_' + key: value for key, value in mets.items()})
+    w2 = self._task_behavior.critic.variables
+    tf.print(all([tf.reduce_all(tf.equal(w1[i], w2[i])) for i in range(len(w1))]))
     return state, metrics
 
   @tf.function
@@ -241,17 +244,21 @@ class ActorCritic(common.Module):
       seq['reward'], mets1 = self.rewnorm(reward)
       mets1 = {f'reward_{k}': v for k, v in mets1.items()}
       target, mets2 = self.target(seq)
-      w1 = seq['weight']
       critic_loss, mets4 = self.critic_loss(seq, target)
 
     with tf.GradientTape() as actor_tape:
       actor_loss, mets3 = self.actor_loss(seq, target)
 
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
-    metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model]))
-    w2 = seq['weight']
-    tf.print(tf.reduce_all(tf.equal(w1, w2)))
-    
+
+    # if self.config.prop_value_every is not None:
+    #   if self.tfstep % self.config.prop_value_every == 0:
+    #     metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm]))
+    #   else:
+    #     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
+
+    metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm]))
+
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.
     return metrics

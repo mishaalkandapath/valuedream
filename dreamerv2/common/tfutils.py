@@ -111,6 +111,13 @@ class Optimizer(tf.Module):
       with tape:
         loss = self._opt.get_scaled_loss(loss)
     grads = tape.gradient(loss, varibs)
+    
+    # Remove NoneType gradients
+    pairs = zip(varibs, grads)  # get rid of the NoneTypes
+    pairs = [(v, g) for v, g in pairs if g is not None]
+    varibs = [p[0] for p in pairs]  # update with new variables
+    grads = [p[1] for p in pairs]   # update with new grads
+
     if self._mixed:
       grads = self._opt.get_unscaled_gradients(grads)
     if self._mixed:
