@@ -1,8 +1,10 @@
 import tensorflow as tf
 from tensorflow.keras import mixed_precision as prec
+import tensorflow_probability as tfp
 
 import common
 import expl
+import pandas as pd
 
 
 class Agent(common.Module):
@@ -104,6 +106,7 @@ class WorldModel(common.Module):
     for name in config.grad_heads:
       assert name in self.heads, name
     self.model_opt = common.Optimizer('model', **config.model_opt)
+    self.reg_measures = {"auto_corr":[], "norm":[]}
 
   def train(self, data, state=None):
     with tf.GradientTape() as model_tape:
@@ -111,6 +114,22 @@ class WorldModel(common.Module):
     modules = [self.encoder, self.rssm, *self.heads.values()]
     metrics.update(self.model_opt(model_tape, model_loss, modules))
     return state, outputs, metrics
+
+  def calc_autocorrelation(code_vecs):
+    # code vecs in 16, 50, len code vecs
+    autocorrelation = tfp.stats.auto_correlation(matrix, max_lags=49, axis=1)
+    autocorrelation = autocorrelation[:,1:,:]
+    avg_corr = tf.reduce_mean(tf.reduce_sum(autocorrelation, axis=2))
+    
+    # norm avgs
+    avg_code_norm = tf.reduce_mean(tf.norm(code_vecs, axis=2))
+    
+    self.reg_measures["auto_corr"].append(avg_corr)
+    self.reg_measures["norm"].append(avg_code_norm)
+    
+    if len(self.reg_measures) % 200 == 0: 
+      pd.to_csv("measures.csv", pd.DataFrame(self.reg_measures), index=False)
+    
 
   def multi_step_helper(self, data):
     #convert the matrix into what we want:
@@ -133,6 +152,8 @@ class WorldModel(common.Module):
     likes = {}
     losses = {'kl': kl_loss}
     feat = self.rssm.get_feat(post)
+    calc_autocorrection(feat.clone().detach())
+    
     for name, head in self.heads.items():
       # print("heyy ", name)
       grad_head = (name in self.config.grad_heads)
