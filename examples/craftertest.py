@@ -1,5 +1,5 @@
 import sys
-sys.path.append("/home/mrmackamoo/valuedream")
+sys.path.append("/home/leesophie99/projects/valuedream")#"/home/mrmackamoo/valuedream")
 import gym
 import crafter
 import dreamerv2.api as dv2
@@ -8,7 +8,7 @@ config = dv2.defaults.update({
     'logdir': '~/logdir/crafter',
     'log_every': 1e3,
     'train_every': 10,
-    'prefill': 1e5,
+    'prefill': 1e2,
     'actor_ent': 3e-3,
     'loss_scales.kl': 1.0,
     'discount': 0.99,
