@@ -4,6 +4,7 @@ from tensorflow.keras import mixed_precision as prec
 import common
 import expl
 
+import numpy as np
 
 class Agent(common.Module):
 
@@ -14,7 +15,7 @@ class Agent(common.Module):
     self.step = step
     self.tfstep = tf.Variable(int(self.step), tf.int64)
     self.wm = WorldModel(config, obs_space, self.tfstep)
-    self._task_behavior = ActorCritic(config, self.act_space, self.tfstep)
+    self._task_behavior = ActorCritic(config, self.act_space, self.tfstep) #actor critic here!
     if config.expl_behavior == 'greedy':
       self._expl_behavior = self._task_behavior
     else:
@@ -234,23 +235,30 @@ class ActorCritic(common.Module):
     # step onwards, which is the first imagined step. However, we are not
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
-    with tf.GradientTape() as actor_tape:
-      seq = world_model.imagine(self.actor, start, is_terminal, hor)
-      reward = reward_fn(seq)
-      seq['reward'], mets1 = self.rewnorm(reward)
-      mets1 = {f'reward_{k}': v for k, v in mets1.items()}
-      target, mets2 = self.target(seq)
-      actor_loss, mets3 = self.actor_loss(seq, target)
-    w1 = seq['weight']
     with tf.GradientTape() as critic_tape:
-      critic_loss, mets4 = self.critic_loss(seq, target)
+        seq = world_model.imagine(self.actor, start, is_terminal, hor)
+        reward = reward_fn(seq)
+        seq['reward'], mets1 = self.rewnorm(reward)
+        mets1 = {f'reward_{k}': v for k, v in mets1.items()}
+        target, mets2 = self.target(seq)
+        critic_loss, mets4 = self.critic_loss(seq, target)
+    with tf.GradientTape() as actor_tape:
+      actor_loss, mets3 = self.actor_loss(seq, target)
+    #Printing weights for debugging
+    tf.print('pre-update')
+    model_weights = [var for var in world_model.rssm.trainable_variables]
+    tf.print(model_weights[0])
+    metrics.update(self.critic_opt(critic_tape, critic_loss, [critic.loss, world_model.rssm])) #Remove critic.loss from array to see weight update on just the world_model.rssm.
+    tf.print('post-update')
+    model_weights = [var for var in world_model.rssm.trainable_variables]
+    tf.print(model_weights[0])
+    #Update the actor
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
     
-    metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.
-    w2 = seq['weight']
-    tf.print(tf.reduce_all(tf.equal(w1, w2)))
+    #w2 = seq['weight']
+    #tf.print(tf.reduce_all(tf.equal(w1, w2)))
     return metrics
 
   def actor_loss(self, seq, target):
