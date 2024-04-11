@@ -111,12 +111,6 @@ class Optimizer(tf.Module):
       with tape:
         loss = self._opt.get_scaled_loss(loss)
     grads = tape.gradient(loss, varibs)
-    
-    # Remove NoneType gradients
-    pairs = zip(varibs, grads)  # get rid of the NoneTypes
-    pairs = [(v, g) for v, g in pairs if g is not None]
-    varibs = [p[0] for p in pairs]  # update with new variables
-    grads = [p[1] for p in pairs]   # update with new grads
 
     if self._mixed:
       grads = self._opt.get_unscaled_gradients(grads)
@@ -126,8 +120,8 @@ class Optimizer(tf.Module):
     #print(self._name)
     #print(grads)
     #print(f'Length of grads is: {len(grads)}')
-    grads = [x if x is not None else 0.0 for x in grads]
-    #print(grads)
+    # grads = [x if x is not None else 0.0 for x in grads]
+    # #print(grads)
     # Distributed sync.
     context = tf.distribute.get_replica_context()
     if context:

@@ -22,6 +22,8 @@ env = crafter.Recorder(
   save_episode=False,
 )
 
+
+
 dv2.train(env, config)
 
 # obs = env.reset()

@@ -59,10 +59,12 @@ class Agent(common.Module):
 
   def acc_wm_grads(self, grad_tup, c_opt):
     if self.wm_accumulator is None:
-      self.wm_accumulator = grad_tup
-      self.critic_optimizer = c_opt
+      new_acc = list(grad_tup)
+      opt = c_opt
     else:
-      self.wm_accumulator = [self.wm_accumulator[i][0] + pair[0] for i, pair in enumerate(grad_tup)]
+      new_acc = [(self.wm_accumulator[i][0] + pair[0], pair[1]) for i, pair in enumerate(list(grad_tup))]
+      opt = c_opt
+    return new_acc, opt
 
   @tf.function
   def train(self, data, state=None):
@@ -75,12 +77,14 @@ class Agent(common.Module):
         self.wm, start, data['is_terminal'], reward)
 
     #accumulate 
-    self.acc_wm_grads(wm_acc, c_opt)
+    self.wm_accumulator, self.critic_optimizer = self.acc_wm_grads(wm_acc, c_opt)
 
     metrics.update(a2c_train_mets)
     w1 = self._task_behavior.critic.variables
-    metrics.update(self._task_behavior.train(
-        self.wm, start, data['is_terminal'], reward))
+    x, world_model_acc, critic_opt = self._task_behavior.train(
+        self.wm, start, data['is_terminal'], reward)
+    self.acc_wm_grads(world_model_acc, critic_opt)
+    metrics.update(x)
     print("RETURNED")
     if self.config.expl_behavior != 'greedy':
       mets = self._expl_behavior.train(start, outputs, data)[-1]
@@ -118,6 +122,7 @@ class WorldModel(common.Module):
     self.model_opt = common.Optimizer('model', **config.model_opt)
 
   def train(self, data, state=None, wm_acc=None, critic_opt=None):
+    print("WM TRAIN")
     if wm_acc is not None:
       assert critic_opt is not None, "gimme tape too"
       critic_opt.apply_gradients(
@@ -263,33 +268,23 @@ class ActorCritic(common.Module):
     # step onwards, which is the first imagined step. However, we are not
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
-    with tf.GradientTape() as actor_tape:
-      with tf.GradientTape() as critic_tape:
-        seq = world_model.imagine(self.actor, start, is_terminal, hor)
-        reward = reward_fn(seq)
-        seq['reward'], mets1 = self.rewnorm(reward)
-        mets1 = {f'reward_{k}': v for k, v in mets1.items()}
-        target, mets2 = self.target(seq)
-        actor_loss, mets3 = self.actor_loss(seq, target)
-        critic_loss, mets4 = self.critic_loss(seq, target)
-
-    metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic)) #Remove critic.loss from array to see weight update on just the world_model.rssm.
-    with tf.GradientTape() as actor_tape:
-      with tf.GradientTape() as critic_tape:
-          seq = world_model.imagine(self.actor, start, is_terminal, hor)
+    with tf.GradientTape() as critic_tape:
+      with tf.GradientTape() as actor_tape:
+        with tf.GradientTape() as model_tape:
+          seq = world_model.imagine(self.actor, start, is_terminal, hor) # generate an imagined trajectory upto horizon H 
           reward = reward_fn(seq)
           seq['reward'], mets1 = self.rewnorm(reward)
           mets1 = {f'reward_{k}': v for k, v in mets1.items()}
           target, mets2 = self.target(seq)
-          critic_loss, mets4 = self.critic_loss(seq, target)
-      
-          actor_loss, mets3 = self.actor_loss(seq, target)
+          actor_loss, mets3 = self.actor_loss(seq, target) # train the actor here based on teh value predictions from the target
+          critic_loss, mets4 = self.critic_loss(seq, target) # train the critic
+
     #Printing weights for debugging
     tf.print('pre-update')
     model_weights = [var for var in world_model.rssm.trainable_variables]
     tf.print(model_weights[0])
     print("CRITIC OPT")
-    metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm])) #Remove critic.loss from array to see weight update on just the world_model.rssm.
+    metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic)) #Remove critic.loss from array to see weight update on just the world_model.rssm.
     tf.print('post-update')
     model_weights = [var for var in world_model.rssm.trainable_variables]
     tf.print(model_weights[0])
@@ -300,11 +295,8 @@ class ActorCritic(common.Module):
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     print("SLOW TARGETS")
     self.update_slow_target()  # Variables exist after first forward pass.
-    return metrics, self.critic_opt(critic_tape, critic_loss, self.world_model.rssm), self.critic_opt._opt
-    #w2 = seq['weight']
-    #tf.print(tf.reduce_all(tf.equal(w1, w2)))
-    print("RETURNING")
-    return metrics
+    return metrics, self.critic_opt.accum_grads_for_module(model_tape, critic_loss, world_model.rssm), self.critic_opt._opt
+
 
   def actor_loss(self, seq, target):
     # Actions:      0   [a1]  [a2]   a3
