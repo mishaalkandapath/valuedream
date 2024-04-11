@@ -8,8 +8,8 @@ import tensorflow as tf
 config = dv2.defaults.update({
     'logdir': '~/logdir/crafter_normal',
     'log_every': 1e3,
-    'train_every': 1,
-    'prefill': 1e2,
+    'train_every': 10,
+    'prefill': 1e5,
     'actor_ent': 3e-3,
     'loss_scales.kl': 1.0,
     'discount': 0.99,

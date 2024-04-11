@@ -68,7 +68,6 @@ class Agent(common.Module):
   @tf.function
   def train(self, data, state=None):
     # tf.print("Graph execution")
-    print("starting TRAIN????????")
     metrics = {}
     state, outputs, mets = self.wm.train(data, state) #one- step prediction given the current observatiion and states
     metrics.update(mets)
@@ -80,7 +79,7 @@ class Agent(common.Module):
       mets = self._expl_behavior.train(start, outputs, data)[-1]
       metrics.update({'expl_' + key: value for key, value in mets.items()})
     # print("DONE TRAINING A2C")
-    print("METRICS IN TRAIN FXN", metrics)
+    # print("METRICS IN TRAIN FXN", metrics)
     return state, metrics
 
   @tf.function
@@ -150,7 +149,7 @@ class WorldModel(common.Module):
     likes = {}
     losses = {'kl': kl_loss}
     feat = self.rssm.get_feat(post)
-    autocor, avgnorm = calc_autocorrelation(tf.stop_gradient(tf.identity(feat)))
+    avgnorm = tf.reduce_mean(tf.norm(tf.stop_gradient(tf.identity(feat)), axis=2))
     
     for name, head in self.heads.items():
       # print("heyy ", name)
@@ -176,7 +175,6 @@ class WorldModel(common.Module):
     metrics['model_kl'] = kl_value.mean()
     metrics['prior_ent'] = self.rssm.get_dist(prior).entropy().mean()
     metrics['post_ent'] = self.rssm.get_dist(post).entropy().mean()
-    metrics["auto_corr"] = autocor
     metrics["avg_norm"] = avgnorm
     last_state = {k: v[:, -1] for k, v in post.items()}
     return model_loss, last_state, outs, metrics
@@ -384,26 +382,27 @@ class ActorCritic(common.Module):
           d.assign(mix * s + (1 - mix) * d)
       self._updates.assign_add(1)
 
-def calc_autocorrelation(code_vecs):
-    print("DID I GET THERE?")
-    # code vecs in 16, 50, len code vecs
-    autocorrelation = tfp.stats.auto_correlation(code_vecs, max_lags=(code_vecs.shape[1]-1), axis=1)
-    # autocorrelation = autocorrelation[:,1:,:]
-    # avg_corr = tf.reduce_mean(tf.reduce_sum(autocorrelation, axis=2))
-    avg_corr = tf.math.count_nonzero(tf.math.is_nan(autocorrelation))
+# def calc_autocorrelation(code_vecs):
+#     return tf.reduce_mean(tf.norm(code_vecs, axis=2))
+#     # print("DID I GET THERE?")
+#     # # code vecs in 16, 50, len code vecs
+#     # autocorrelation = tfp.stats.auto_correlation(code_vecs, max_lags=(code_vecs.shape[1]-1), axis=1)
+#     # # autocorrelation = autocorrelation[:,1:,:]
+#     # # avg_corr = tf.reduce_mean(tf.reduce_sum(autocorrelation, axis=2))
+#     # avg_corr = tf.math.count_nonzero(tf.math.is_nan(autocorrelation))
     
-    # norm avgs
-    avg_code_norm = tf.reduce_mean(tf.norm(code_vecs, axis=2))
-    # with tf.Session() as sess:
-    # with tf.compat.v1.Session() as sess:
-    # # print(avg_corr.numpy())    
-    # # self.reg_measures["auto_corr"].append(tf.keras.backend.eval(avg_corr))
-    #   print(sess.run(avg_corr))
-    #   # self.reg_measures["norm"].append(avg_corr.eval())
-    #   # self.reg_measures["norm"].append(avg_code_norm.eval())
+#     # # norm avgs
+#     # avg_code_norm = tf.reduce_mean(tf.norm(code_vecs, axis=2))
+#     # # with tf.Session() as sess:
+#     # # with tf.compat.v1.Session() as sess:
+#     # # # print(avg_corr.numpy())    
+#     # # # self.reg_measures["auto_corr"].append(tf.keras.backend.eval(avg_corr))
+#     # #   print(sess.run(avg_corr))
+#     # #   # self.reg_measures["norm"].append(avg_corr.eval())
+#     # #   # self.reg_measures["norm"].append(avg_code_norm.eval())
     
-    # print("BEGINNING IO???")
-    # if len(self.reg_measures) % 1 == 0: 
-    #   pd.DataFrame(self.reg_measures).to_csv("measures.csv", index=False)
-    print("COMPLETED IO???????")
-    return avg_corr, avg_code_norm
+#     # # print("BEGINNING IO???")
+#     # # if len(self.reg_measures) % 1 == 0: 
+#     # #   pd.DataFrame(self.reg_measures).to_csv("measures.csv", index=False)
+#     # print("COMPLETED IO???????")
+#     # return avg_corr, avg_code_norm
