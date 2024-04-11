@@ -238,7 +238,6 @@ class ActorCritic(common.Module):
     # step onwards, which is the first imagined step. However, we are not
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
-<<<<<<< HEAD
     with tf.GradientTape() as critic_tape:
         seq = world_model.imagine(self.actor, start, is_terminal, hor)
         reward = reward_fn(seq)
