@@ -15,6 +15,8 @@ class Agent(common.Module):
     self.step = step
     self.tfstep = tf.Variable(int(self.step), tf.int64)
     self.wm = WorldModel(config, obs_space, self.tfstep)
+    self.wm_accumulator = None
+    self.critic_optimizer = None
     self._task_behavior = ActorCritic(config, self.act_space, self.tfstep) #actor critic here!
     if config.expl_behavior == 'greedy':
       self._expl_behavior = self._task_behavior
@@ -55,6 +57,13 @@ class Agent(common.Module):
     state = (latent, action)
     return outputs, state
 
+  def acc_wm_grads(self, grad_tup, c_opt):
+    if self.wm_accumulator is None:
+      self.wm_accumulator = grad_tup
+      self.critic_optimizer = c_opt
+    else:
+      self.wm_accumulator = [self.wm_accumulator[i][0] + pair[0] for i, pair in enumerate(grad_tup)]
+
   @tf.function
   def train(self, data, state=None):
     metrics = {}
@@ -62,6 +71,13 @@ class Agent(common.Module):
     metrics.update(mets)
     start = outputs['post']
     reward = lambda seq: self.wm.heads['reward'](seq['feat']).mode()
+    a2c_train_mets, wm_acc, c_opt = self._task_behavior.train(
+        self.wm, start, data['is_terminal'], reward)
+
+    #accumulate 
+    self.acc_wm_grads(wm_acc, c_opt)
+
+    metrics.update(a2c_train_mets)
     w1 = self._task_behavior.critic.variables
     metrics.update(self._task_behavior.train(
         self.wm, start, data['is_terminal'], reward))
@@ -101,7 +117,13 @@ class WorldModel(common.Module):
       assert name in self.heads, name
     self.model_opt = common.Optimizer('model', **config.model_opt)
 
-  def train(self, data, state=None):
+  def train(self, data, state=None, wm_acc=None, critic_opt=None):
+    if wm_acc is not None:
+      assert critic_opt is not None, "gimme tape too"
+      critic_opt.apply_gradients(
+        wm_acc,
+        experimental_aggregate_gradients=False)
+
     with tf.GradientTape() as model_tape:
       model_loss, state, outputs, metrics = self.loss(data, state)
     modules = [self.encoder, self.rssm, *self.heads.values()]
@@ -243,6 +265,17 @@ class ActorCritic(common.Module):
     # them to scale the whole sequence.
     with tf.GradientTape() as actor_tape:
       with tf.GradientTape() as critic_tape:
+        seq = world_model.imagine(self.actor, start, is_terminal, hor)
+        reward = reward_fn(seq)
+        seq['reward'], mets1 = self.rewnorm(reward)
+        mets1 = {f'reward_{k}': v for k, v in mets1.items()}
+        target, mets2 = self.target(seq)
+        actor_loss, mets3 = self.actor_loss(seq, target)
+        critic_loss, mets4 = self.critic_loss(seq, target)
+
+    metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic)) #Remove critic.loss from array to see weight update on just the world_model.rssm.
+    with tf.GradientTape() as actor_tape:
+      with tf.GradientTape() as critic_tape:
           seq = world_model.imagine(self.actor, start, is_terminal, hor)
           reward = reward_fn(seq)
           seq['reward'], mets1 = self.rewnorm(reward)
@@ -267,6 +300,7 @@ class ActorCritic(common.Module):
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     print("SLOW TARGETS")
     self.update_slow_target()  # Variables exist after first forward pass.
+    return metrics, self.critic_opt(critic_tape, critic_loss, self.world_model.rssm), self.critic_opt._opt
     #w2 = seq['weight']
     #tf.print(tf.reduce_all(tf.equal(w1, w2)))
     print("RETURNING")
