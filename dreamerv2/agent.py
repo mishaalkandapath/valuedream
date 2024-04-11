@@ -238,15 +238,16 @@ class ActorCritic(common.Module):
     # step onwards, which is the first imagined step. However, we are not
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
-    with tf.GradientTape() as critic_tape:
-        seq = world_model.imagine(self.actor, start, is_terminal, hor)
-        reward = reward_fn(seq)
-        seq['reward'], mets1 = self.rewnorm(reward)
-        mets1 = {f'reward_{k}': v for k, v in mets1.items()}
-        target, mets2 = self.target(seq)
-        critic_loss, mets4 = self.critic_loss(seq, target)
     with tf.GradientTape() as actor_tape:
-      actor_loss, mets3 = self.actor_loss(seq, target)
+        with tf.GradientTape() as critic_tape:
+            seq = world_model.imagine(self.actor, start, is_terminal, hor)
+            reward = reward_fn(seq)
+            seq['reward'], mets1 = self.rewnorm(reward)
+            mets1 = {f'reward_{k}': v for k, v in mets1.items()}
+            target, mets2 = self.target(seq)
+            critic_loss, mets4 = self.critic_loss(seq, target)
+        actor_loss, mets3 = self.actor_loss(seq, target)
+    
     #Printing weights for debugging
     tf.print('pre-update')
     model_weights = [var for var in world_model.rssm.trainable_variables]
