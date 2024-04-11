@@ -16,7 +16,7 @@ defaults:
   eval_every: 1e5
   eval_eps: 1
   prefill: 10000
-  pretrain: 1
+  pretrain: 0
   train_every: 5
   train_steps: 1
   expl_until: 0
@@ -27,7 +27,7 @@ defaults:
   log_keys_mean: '^$'
   log_keys_max: '^$'
   precision: 16
-  jit: True
+  jit: False
 
   # Agent
   clip_rewards: tanh
@@ -110,7 +110,7 @@ crafter:
   log_keys_sum: '^log_reward$'
   rssm: {hidden: 128, deter: 128}
   discount: 0.999
-  prefill: 1000
+  prefill: 0
   model_opt.lr: 1e-4
   actor_opt.lr: 1e-4
   critic_opt.lr: 1e-4
