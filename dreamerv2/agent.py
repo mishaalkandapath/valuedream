@@ -15,6 +15,8 @@ class Agent(common.Module):
     self.step = step
     self.tfstep = tf.Variable(int(self.step), tf.int64)
     self.wm = WorldModel(config, obs_space, self.tfstep)
+    
+    # Line 20, 21 are new components
     self.wm_accumulator = None
     self.critic_optimizer = None
     self._task_behavior = ActorCritic(config, self.act_space, self.tfstep) #actor critic here!
@@ -81,17 +83,11 @@ class Agent(common.Module):
 
     metrics.update(a2c_train_mets)
     w1 = self._task_behavior.critic.variables
-    x, world_model_acc, critic_opt = self._task_behavior.train(
-        self.wm, start, data['is_terminal'], reward)
-    self.acc_wm_grads(world_model_acc, critic_opt)
-    metrics.update(x)
-    print("RETURNED")
     if self.config.expl_behavior != 'greedy':
       mets = self._expl_behavior.train(start, outputs, data)[-1]
       metrics.update({'expl_' + key: value for key, value in mets.items()})
     w2 = self._task_behavior.critic.variables
     # tf.print(all([tf.reduce_all(tf.equal(w1[i], w2[i])) for i in range(len(w1))]))
-    print("RETURN TRAIN")
     return state, metrics
 
   @tf.function
@@ -260,7 +256,7 @@ class ActorCritic(common.Module):
     self.rewnorm = common.StreamNorm(**self.config.reward_norm)
 
   def train(self, world_model, start, is_terminal, reward_fn):
-    print("STARTING TRAIN of ACTOR CRITIC")
+    # print("STARTING TRAIN of ACTOR CRITIC")
     metrics = {}
     hor = self.config.imag_horizon
     # The weights are is_terminal flags for the imagination start states.
@@ -283,17 +279,17 @@ class ActorCritic(common.Module):
     tf.print('pre-update')
     model_weights = [var for var in world_model.rssm.trainable_variables]
     tf.print(model_weights[0])
-    print("CRITIC OPT")
+    # print("CRITIC OPT")
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic)) #Remove critic.loss from array to see weight update on just the world_model.rssm.
     tf.print('post-update')
     model_weights = [var for var in world_model.rssm.trainable_variables]
     tf.print(model_weights[0])
     #Update the actor
-    print("ACTOR OPT")
+    # print("ACTOR OPT")
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
     
     metrics.update(**mets1, **mets2, **mets3, **mets4)
-    print("SLOW TARGETS")
+    # print("SLOW TARGETS")
     self.update_slow_target()  # Variables exist after first forward pass.
     return metrics, self.critic_opt.accum_grads_for_module(model_tape, critic_loss, world_model.rssm), self.critic_opt._opt
 
