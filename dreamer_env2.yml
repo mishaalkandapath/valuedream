@@ -1,4 +1,4 @@
-name: test
+name: namedoesnotexist
 channels:
   - conda-forge
   - defaults
@@ -8,9 +8,9 @@ dependencies:
   - blas=1.0=mkl
   - ca-certificates=2024.2.2=hbcca054_0
   - cloudpickle=3.0.0=pyhd8ed1ab_0
-  - cudatoolkit=12.0.0
+  # - cudatoolkit=12.0.0
   - cudnn=8.1.0.77
-  # - cudatoolkit=11.2.2=hc23eb0c_13
+  - cudatoolkit=11.2.2=hc23eb0c_13
   # - cudnn=8.1.0.77=h90431f1_0
   # - gym=0.21.0=py39hef51801_2
   - intel-openmp=2023.1.0=hdb19cb5_46306
