@@ -152,6 +152,59 @@ class Optimizer(tf.Module):
 
     return metrics
 
+  def accum_grads_for_module(self, tape, loss, modules):
+    assert loss.dtype is tf.float32, (self._name, loss.dtype)
+    assert len(loss.shape) == 0, (self._name, loss.shape)
+    metrics = {}
+
+    # Find variables.
+    modules = modules if hasattr(modules, '__len__') else (modules,)
+    varibs = tf.nest.flatten([module.variables for module in modules])
+    count = sum(np.prod(x.shape) for x in varibs)
+    if self._once:
+      print(f'Found {count} {self._name} parameters.')
+      self._once = False
+
+    # Check loss.
+    tf.debugging.check_numerics(loss, self._name + '_loss')
+    metrics[f'{self._name}_loss'] = loss
+
+    # Compute scaled gradient.
+    if self._mixed:
+      with tape:
+        loss = self._opt.get_scaled_loss(loss)
+    grads = tape.gradient(loss, varibs)
+
+    if self._mixed:
+      grads = self._opt.get_unscaled_gradients(grads)
+    if self._mixed:
+      metrics[f'{self._name}_loss_scale'] = self._opt.loss_scale
+
+    #print(self._name)
+    #print(grads)
+    #print(f'Length of grads is: {len(grads)}')
+    grads = [x if x is not None else 0.0 for x in grads]
+    #print(grads)
+    # Distributed sync.
+    context = tf.distribute.get_replica_context()
+    if context:
+      grads = context.all_reduce('mean', grads)
+
+    # Gradient clipping.
+    norm = tf.linalg.global_norm(grads)
+    if not self._mixed:
+      tf.debugging.check_numerics(norm, self._name + '_norm')
+    if self._clip:
+      grads, _ = tf.clip_by_global_norm(grads, self._clip, norm)
+    metrics[f'{self._name}_grad_norm'] = norm
+
+    # Weight decay.
+    if self._wd:
+      self._apply_weight_decay(varibs)
+
+    # just dont apply gradients
+    return zip(grads, varibs)
+
   def _apply_weight_decay(self, varibs):
     nontrivial = (self._wd_pattern != r'.*')
     if nontrivial:
