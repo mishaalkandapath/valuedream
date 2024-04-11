@@ -116,6 +116,7 @@ def train(env, config, outputs=None):
     if should_train(step):
       for _ in range(config.train_steps):
         mets = train_agent(next(dataset))
+        # print("PRINGING METRICS", mets)
         [metrics[key].append(value) for key, value in mets.items()]
     if should_log(step):
       for name, values in metrics.items():

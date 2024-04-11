@@ -8,8 +8,8 @@ import tensorflow as tf
 config = dv2.defaults.update({
     'logdir': '~/logdir/crafter_normal',
     'log_every': 1e3,
-    'train_every': 10,
-    'prefill': 1e5,
+    'train_every': 1,
+    'prefill': 1e2,
     'actor_ent': 3e-3,
     'loss_scales.kl': 1.0,
     'discount': 0.99,
@@ -24,10 +24,10 @@ env = crafter.Recorder(
   save_episode=False,
 )
 
-gpus = tf.config.list_physical_devices('GPU')
+# gpus = tf.config.list_physical_devices('GPU')
 # for gpu in gpus:
 #       tf.config.experimental.set_memory_growth(gpu, True)
-tf.config.set_visible_devices(gpus[1], "GPU")
+# tf.config.set_visible_devices(gpus[1], "GPU")
 
 dv2.train(env, config)
 
