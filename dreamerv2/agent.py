@@ -228,7 +228,7 @@ class ActorCritic(common.Module):
       self._target_critic = self.critic
     self.actor_opt = common.Optimizer('actor', **self.config.actor_opt)
     self.critic_opt = common.Optimizer('critic', **self.config.critic_opt)
-    self.wm_opt = common.WMOptimizer('wm', **self.config.critic_opt, accum_steps=self.config.accum_steps)
+    self.wm_opt = common.WMOptimizer('wm', **self.config.critic_opt, accum_steps=self.config.accum_steps, train_every=self.config.train_every)
     self.rewnorm = common.StreamNorm(**self.config.reward_norm)
 
   def train(self, world_model, start, is_terminal, reward_fn):

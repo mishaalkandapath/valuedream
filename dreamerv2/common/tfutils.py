@@ -165,11 +165,12 @@ class Optimizer(tf.Module):
 class WMOptimizer(Optimizer):
   def __init__(
       self, name, lr, eps=1e-4, clip=None, wd=None,
-      opt='adam', wd_pattern=r'.*', accum_steps=1):
+      opt='adam', wd_pattern=r'.*', accum_steps=1, train_every=1):
     super().__init__(name, lr, eps, clip, wd, opt, wd_pattern)
     self.accum_steps = accum_steps
     self.accum_grad = None
     self.accum_type = 'sum'
+    self.train_every = train_every
 
   def __call__(self, tape, loss, modules, steps=1):
     assert loss.dtype is tf.float32, (self._name, loss.dtype)
@@ -224,7 +225,7 @@ class WMOptimizer(Optimizer):
     metrics[f'{self._name}_grad_norm'] = norm
 
     # Apply gradients.
-    if steps % self.accum_steps == 0:
+    if steps % self.accum_steps * self.train_every == 0:
       # Weight decay.
       if self._wd:
         self._apply_weight_decay(varibs)
