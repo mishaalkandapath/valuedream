@@ -149,7 +149,8 @@ class WorldModel(common.Module):
     assert len(kl_loss.shape) == 0
     likes = {}
     losses = {'kl': kl_loss}
-    feat = self.post_feat = self.rssm.get_feat(post)
+    feat = self.rssm.get_feat(post)
+    self.post_feat = tf.stop_gradient(feat)
     avgnorm = tf.reduce_mean(tf.norm(tf.stop_gradient(tf.identity(feat)), axis=2))
     
     for name, head in self.heads.items():
