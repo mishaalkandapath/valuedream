@@ -399,7 +399,7 @@ class ActorCritic(common.Module):
     
     # mask -- TODO: this won't also mask random places that happen to be 1 (this is possible maybe idk)
     mask = tf.cast(tf.equal(all_batches, 0.0), tf.bool)
-    print("MASK::", mask)
+    print("MASK::", mask[:][35:50])
     return all_batches, mask
 
   def target(self, seq):
