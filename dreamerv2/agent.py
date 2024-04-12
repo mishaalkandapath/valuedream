@@ -381,7 +381,9 @@ class ActorCritic(common.Module):
     print("ESTIMATED VALUE OF CODE VECS ", estimated_code_value)
     # tfp.distributions.Independent("IndependentNormal_6", batch_shape=[8, 50], event_shape=[], dtype=float32)
     reshaped_batch, mask = self.itervaml_helper(estimated_code_value)
-    critic_loss = -(dist.log_prob(estimated_code_value)).mean()
+    neg_loglike = -(dist.log_prob(reshaped_batch))
+    print("NEGLOGLIKE::", neg_loglike, tf.where(mask, neg_loglike, 0))
+    critic_loss = tf.where(mask, neg_loglike, 0).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
 
@@ -396,9 +398,8 @@ class ActorCritic(common.Module):
                                         else tf.pad(x[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT", constant_values=-np.inf) for i in range(seqlen)]) # row/batch = (50,) -> (50,15)
     all_batches = tf.transpose(tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0), [1,0])
     
-    # mask -- TODO: this won't also mask random places that happen to be 1 (this is possible maybe idk)
+    # mask
     mask = tf.cast(tf.equal(all_batches, -np.inf), tf.bool)
-    print("MASK::", mask, all_batches)
     return all_batches, mask
 
   def target(self, seq):
