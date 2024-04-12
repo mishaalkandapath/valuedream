@@ -384,7 +384,8 @@ class ActorCritic(common.Module):
     reshaped_batch, mask = self.itervaml_helper(estimated_code_value)
     neg_loglike = -(dist.log_prob(reshaped_batch))
     print("NEGLOGLIKE::", neg_loglike, tf.where(mask, neg_loglike, 0))
-    print("ANY INF LEFT?", tf.reduce_any(tf.where(mask, neg_loglike, 0) == np.inf))
+    if tf.reduce_any(tf.math.is_inf(tf.where(mask, neg_loglike, 0))): print("HELP THERE WAS INFS LEFT")
+    else: print("NOPE, NO INFS")
     critic_loss = tf.where(mask, neg_loglike, 0).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
