@@ -4,7 +4,6 @@ import tensorflow_probability as tfp
 
 import common
 import expl
-import pandas as pd
 
 class Agent(common.Module):
 
@@ -392,14 +391,14 @@ class ActorCritic(common.Module):
     # output: (horizon, batch*seqlen) == (15,800)
     hor = self.config.imag_horizon
     seqlen = post_val.shape[1]
-
-    reshape_batch = lambda x: tf.stack([x[i:i+hor] if i <= (seqlen - hor) else tf.pad(x[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT") 
-               for i in range(seqlen)]) # row/batch = (50,) -> (50,15)
+    import numpy as np
+    reshape_batch = lambda x: tf.stack([x[i:i+hor] if i <= (seqlen - hor) 
+                                        else tf.pad(x[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT", constant_values=-np.inf) for i in range(seqlen)]) # row/batch = (50,) -> (50,15)
     all_batches = tf.transpose(tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0), [1,0])
     
     # mask -- TODO: this won't also mask random places that happen to be 1 (this is possible maybe idk)
-    mask = tf.cast(tf.equal(all_batches, 0.0), tf.bool)
-    print("MASK::", mask[:][35:50])
+    mask = tf.cast(tf.equal(all_batches, -np.inf), tf.bool)
+    # print("MASK::", mask[:][35:50])
     return all_batches, mask
 
   def target(self, seq):
