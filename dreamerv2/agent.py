@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import mixed_precision as prec
 import tensorflow_probability as tfp
+import numpy as np
 
 import common
 import expl
@@ -383,6 +384,7 @@ class ActorCritic(common.Module):
     reshaped_batch, mask = self.itervaml_helper(estimated_code_value)
     neg_loglike = -(dist.log_prob(reshaped_batch))
     print("NEGLOGLIKE::", neg_loglike, tf.where(mask, neg_loglike, 0))
+    print("ANY INF LEFT?", tf.reduce_any(tf.where(mask, neg_loglike, 0) == np.inf))
     critic_loss = tf.where(mask, neg_loglike, 0).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
@@ -393,7 +395,6 @@ class ActorCritic(common.Module):
     # output: (horizon, batch*seqlen) == (15,800)
     hor = self.config.imag_horizon
     seqlen = post_val.shape[1]
-    import numpy as np
     reshape_batch = lambda x: tf.stack([x[i:i+hor] if i <= (seqlen - hor) 
                                         else tf.pad(x[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT", constant_values=-np.inf) for i in range(seqlen)]) # row/batch = (50,) -> (50,15)
     all_batches = tf.transpose(tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0), [1,0])
