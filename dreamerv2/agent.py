@@ -394,8 +394,9 @@ class ActorCritic(common.Module):
     # for each batch (row), 
     row = post_val[0][:]
     print("ROW:::", row)
-    fat_row = tf.concat([row[i:i+hor] if i <= (post_val - hor) else tf.pad(row[i:], tf.constant([[0,hor-i]]), "CONSTANT") 
-               for i in range(hor)], 0)
+    print(row[5:5+hor])
+    fat_row = tf.stack([row[i:i+hor] if i <= (post_val - hor) else tf.pad(row[i:], tf.constant([[0,hor-i]]), "CONSTANT") 
+               for i in range(hor)])
     print("FAT ROW:::",fat_row)
     # output = tf.zeros(expected_post_val.shape, dtype=tf.float32)
     # new_images = tf.concat([tf.zeros() + expected_post_val[i:, :] for i in range(0, 5)], 0)
