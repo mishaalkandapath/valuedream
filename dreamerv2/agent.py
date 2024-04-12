@@ -15,7 +15,7 @@ class Agent(common.Module):
     self.step = step
     self.tfstep = tf.Variable(int(self.step), tf.int64)
     self.wm = WorldModel(config, obs_space, self.tfstep)
-    self._task_behavior = ActorCritic(config, self.act_space, self.tfstep) #actor critic here!
+    self._task_behavior = ActorCritic(config, self.act_space, self.tfstep, self.wm) #actor critic here!
     if config.expl_behavior == 'greedy':
       self._expl_behavior = self._task_behavior
     else:
@@ -208,7 +208,7 @@ class WorldModel(common.Module):
 
 class ActorCritic(common.Module):
 
-  def __init__(self, config, act_space, tfstep):
+  def __init__(self, config, act_space, tfstep, wm): #adding worldmodel to ac initalization to get shape for grad accumulation
     self.config = config
     self.act_space = act_space
     self.tfstep = tfstep
@@ -230,6 +230,7 @@ class ActorCritic(common.Module):
     self.critic_opt = common.Optimizer('critic', **self.config.critic_opt)
     self.wm_opt = common.Optimizer('wm', **self.config.critic_opt)
     self.rewnorm = common.StreamNorm(**self.config.reward_norm)
+    self.acc_gradients = [tf.Variable(tf.zeros_like(i, dtype=tf.float32), trainable=False) for i in wm.rssm.trainable_variables]
 
   def train(self, world_model, start, is_terminal, reward_fn):
     metrics = {}
@@ -249,29 +250,37 @@ class ActorCritic(common.Module):
               target, mets2 = self.target(seq)
               critic_loss, mets4 = self.critic_loss(seq, target)
         actor_loss, mets3 = self.actor_loss(seq, target)
-    
-    
-    #Update the actor
+    print(self.acc_gradients[0].shape)#, world_model.rssm.trainable_variables[0].shape) 
+    #Get wm gradients wrt critic loss
+    wm_critic_grads = wm_tape.gradient(critic_loss, world_model.rssm.trainable_variables)
+    #Accumulate the gradients
+    for i in range(len(self.acc_gradients)):
+        self.acc_gradients[i].assign_add(wm_critic_grads[i])
+        
+    #Update the actor and critic BEFORE applying any wm critic loss updates
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
-
-    # Update the critic
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
 
     #Printing weights for debugging
     tf.print('pre-update')
-    model_weights = [var for var in world_model.rssm.trainable_variables]
-    tf.print(model_weights[0])
+    model_weights_pre = [var for var in world_model.rssm.trainable_variables]
+    tf.print(model_weights_pre[0])
     
-    metrics.update(self.wm_opt(wm_tape, critic_loss, world_model.rssm)) 
+    #Check that we have gone the specified number of iterations before applying the accumulated grads
+    if self.tfstep % self.config.prop_value_every == 0:
+        print(self.acc_gradients)
+        self.wm_opt.apply_accumulated_gradients(self.acc_gradients, world_model.rssm) 
+
+    #metrics.update(self.wm_opt(wm_tape, critic_loss, world_model.rssm)) #old way of updating wm after each step 
     
     tf.print('post-update')
     model_weights = [var for var in world_model.rssm.trainable_variables]
     tf.print(model_weights[0])
-    
+    #tf.print(self.tfstep) 
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.
     #w2 = seq['weight']
-    #tf.print(tf.reduce_all(tf.equal(w1, w2)))
+    #print(model_weights[0][0, 0], model_weights_pre[0][0, 0])
     return metrics
 
   def actor_loss(self, seq, target):

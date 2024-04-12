@@ -17,7 +17,7 @@ defaults:
   eval_eps: 1
   prefill: 10000
   pretrain: 0
-  train_every: 5
+  train_every: 1
   train_steps: 1
   expl_until: 0
   replay: {capacity: 2e6, ongoing: False, minlen: 10, maxlen: 10, prioritize_ends: True}
@@ -64,7 +64,7 @@ defaults:
   slow_target_fraction: 1
   slow_baseline: True
   reward_norm: {momentum: 1.0, scale: 1.0, eps: 1e-8}
-  prop_value_every: 10
+  prop_value_every: 2
 
   # Exploration
   expl_intr_scale: 1.0
@@ -110,7 +110,7 @@ crafter:
   log_keys_sum: '^log_reward$'
   rssm: {hidden: 128, deter: 128}
   discount: 0.999
-  prefill: 0
+  prefill: 100
   model_opt.lr: 1e-4
   actor_opt.lr: 1e-4
   critic_opt.lr: 1e-4

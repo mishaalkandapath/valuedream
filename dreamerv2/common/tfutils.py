@@ -126,7 +126,7 @@ class Optimizer(tf.Module):
     #print(self._name)
     #print(grads)
     #print(f'Length of grads is: {len(grads)}')
-    grads = [x if x is not None else 0.0 for x in grads]
+    grads = [x if x is not None else 0.0 for x in grads] #Set none type gradients to 0.0
     #print(grads)
     # Distributed sync.
     context = tf.distribute.get_replica_context()
@@ -161,3 +161,20 @@ class Optimizer(tf.Module):
         if nontrivial:
           print('- ' + self._name + '/' + var.name)
         var.assign((1 - self._wd) * var)
+
+  #Manual method to apply accumulated gradients
+  def apply_accumulated_gradients(self, grads, modules):
+    modules = modules if hasattr(modules, '__len__') else (modules,)
+    varibs = tf.nest.flatten([module.variables for module in modules])
+
+    # Remove NoneType gradients
+    pairs = zip(varibs, grads)  # get rid of the NoneTypes
+    pairs = [(v, g) for v, g in pairs if g is not None]
+    varibs = [p[0] for p in pairs]  # update with new variables
+    grads = [p[1] for p in pairs]   # update with new grads
+    print(len(grads),len(varibs))
+    self._opt.apply_gradients(
+        zip(grads, varibs),
+        experimental_aggregate_gradients=False)
+    
+    return None
