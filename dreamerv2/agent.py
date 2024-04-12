@@ -228,7 +228,7 @@ class ActorCritic(common.Module):
       self._target_critic = self.critic
     self.actor_opt = common.Optimizer('actor', **self.config.actor_opt)
     self.critic_opt = common.Optimizer('critic', **self.config.critic_opt)
-    self.wm_opt = common.Optimizer('wm', **self.config.critic_opt)
+    self.wm_opt = common.WMOptimizer('wm', **self.config.critic_opt, accum_steps=self.config.accum_steps)
     self.rewnorm = common.StreamNorm(**self.config.reward_norm)
     self.acc_gradients = [tf.Variable(tf.zeros_like(i, dtype=tf.float32), trainable=False) for i in wm.rssm.trainable_variables]
 

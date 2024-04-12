@@ -53,6 +53,7 @@ defaults:
   critic: {layers: 4, units: 100, act: elu, norm: none, dist: mse}
   actor_opt: {opt: adam, lr: 8e-5, eps: 1e-5, clip: 100, wd: 1e-6}
   critic_opt: {opt: adam, lr: 2e-4, eps: 1e-5, clip: 100, wd: 1e-6}
+  accum_steps: 1
   discount: 0.99
   discount_lambda: 0.95
   imag_horizon: 8
