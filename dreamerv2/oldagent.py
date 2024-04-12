@@ -4,7 +4,8 @@ from tensorflow.keras import mixed_precision as prec
 import common
 import expl
 
-class Agent(common.Module):
+
+class OldAgent(common.Module):
 
   def __init__(self, config, obs_space, act_space, step):
     self.config = config
@@ -12,8 +13,8 @@ class Agent(common.Module):
     self.act_space = act_space['action']
     self.step = step
     self.tfstep = tf.Variable(int(self.step), tf.int64)
-    self.wm = WorldModel(config, obs_space, self.tfstep)
-    self._task_behavior = ActorCritic(config, self.act_space, self.tfstep)
+    self.wm = OldWorldModel(config, obs_space, self.tfstep)
+    self._task_behavior = OldActorCritic(config, self.act_space, self.tfstep)
     if config.expl_behavior == 'greedy':
       self._expl_behavior = self._task_behavior
     else:
@@ -23,29 +24,19 @@ class Agent(common.Module):
 
   @tf.function
   def policy(self, obs, state=None, mode='train'):
-    """
-    Given an observation and prev_state (a tuple w the prev stochastic state and prev action), embed the observation.
-    Then use the embedding, action, and stochastic state to get the next stochastic state+deterministic state representation. 
-    Use these features to sample the next action. 
-    After you get 
-    return the action and the new state
-    """
-    # print("---At Policy--")
-    # print("Is state none? {}".format(state is None))
-    # print("Obs shape we have is: {}".format(obs['image'].shape))
     obs = tf.nest.map_structure(tf.tensor, obs)
     tf.py_function(lambda: self.tfstep.assign(
         int(self.step), read_value=False), [], [])
     if state is None:
       latent = self.wm.rssm.initial(len(obs['reward']))
-      action = tf.zeros((len(obs['reward']),) + self.act_space.shape) # generate the zero action giving shape batchxaction_space: (b, 17)
+      action = tf.zeros((len(obs['reward']),) + self.act_space.shape)
       state = latent, action
     latent, action = state
-    embed = self.wm.encoder(self.wm.preprocess(obs)) #preprocessing just make a reward clipping function, and initializes the discount factors with 0 for terminal states
+    embed = self.wm.encoder(self.wm.preprocess(obs))
     sample = (mode == 'train') or not self.config.eval_state_mean
     latent, _ = self.wm.rssm.obs_step(
-        latent, action, embed, obs['is_first'], sample) # get the posteriors
-    feat = self.wm.rssm.get_feat(latent) # a concatenation of the stochastic and determinisitc state
+        latent, action, embed, obs['is_first'], sample)
+    feat = self.wm.rssm.get_feat(latent)
     if mode == 'eval':
       actor = self._task_behavior.actor(feat)
       action = actor.mode()
@@ -65,18 +56,16 @@ class Agent(common.Module):
 
   @tf.function
   def train(self, data, state=None):
-    # tf.print("Graph execution")
     metrics = {}
-    state, outputs, mets = self.wm.train(data, state) #one- step prediction given the current observatiion and states
+    state, outputs, mets = self.wm.train(data, state)
     metrics.update(mets)
     start = outputs['post']
     reward = lambda seq: self.wm.heads['reward'](seq['feat']).mode()
     metrics.update(self._task_behavior.train(
-        self.wm, start, data['is_terminal'], reward)) # train the actor-critic model
+        self.wm, start, data['is_terminal'], reward))
     if self.config.expl_behavior != 'greedy':
       mets = self._expl_behavior.train(start, outputs, data)[-1]
       metrics.update({'expl_' + key: value for key, value in mets.items()})
-    # print("DONE TRAINING A2C")
     return state, metrics
 
   @tf.function
@@ -89,7 +78,7 @@ class Agent(common.Module):
     return report
 
 
-class WorldModel(common.Module):
+class OldWorldModel(common.Module):
 
   def __init__(self, config, obs_space, tfstep):
     shapes = {k: tuple(v.shape) for k, v in obs_space.items()}
@@ -98,7 +87,7 @@ class WorldModel(common.Module):
     self.rssm = common.EnsembleRSSM(**config.rssm)
     self.encoder = common.Encoder(shapes, **config.encoder)
     self.heads = {}
-    self.heads['decoder'] = common.RecurrentDecoder(shapes, **config.decoder) 
+    self.heads['decoder'] = common.Decoder(shapes, **config.decoder)
     self.heads['reward'] = common.MLP([], **config.reward_head)
     if config.pred_discount:
       self.heads['discount'] = common.MLP([], **config.discount_head)
@@ -109,67 +98,29 @@ class WorldModel(common.Module):
   def train(self, data, state=None):
     with tf.GradientTape() as model_tape:
       model_loss, state, outputs, metrics = self.loss(data, state)
-    # print("DONE INFERENCE PART")
     modules = [self.encoder, self.rssm, *self.heads.values()]
     metrics.update(self.model_opt(model_tape, model_loss, modules))
-    # print("DONE UPDATE")
     return state, outputs, metrics
 
-  def multi_step_helper(self, data):
-    #convert the matrix into what we want:
-    swap = lambda x: tf.transpose(x, [1, 0] + list(range(2, len(x.shape))))
-    images = data["image"]
-    images = swap(images)
-    new_images = tf.concat([images[i:, :] for i in range(0, 5)], 0)
-    return swap(new_images)    
-
   def loss(self, data, state=None):
-    # print("At Loss, data shape: {} {}".format(data["image"].shape, data["action"].shape))
-    # with tf.Session() as sess: print("the first few actions are {}".format(data["action"][0, 0:3].eval())) 
     data = self.preprocess(data)
     embed = self.encoder(data)
-    # print("PROCESSED WITH ENCODER")
-    # print("state is none? {}".format(state is None))
-    # print("but we have data of shape {}".format(data["image"].shape))  
     post, prior = self.rssm.observe(
         embed, data['action'], data['is_first'], state)
-    # print("DONE OBSERVING")
-    kl_loss, kl_value = self.rssm.kl_loss(post, prior, **self.config.kl) # kl loss between post and prior
+    kl_loss, kl_value = self.rssm.kl_loss(post, prior, **self.config.kl)
     assert len(kl_loss.shape) == 0
     likes = {}
     losses = {'kl': kl_loss}
     feat = self.rssm.get_feat(post)
-
-    #for the decoder:
-    head = self.heads['decoder']
-    inp = feat
-    out = head(inp, data["action"])
-    dists = out if isinstance(out, dict) else {"decoder": out}
-    for key, dist in dists.items():
-      like = tf.cast(dist.log_prob(self.multi_step_helper(data)), tf.float32)
-      likes[key] = like
-      losses[key] = -like.mean()
-
-    #for the reward head
-    head = self.heads['reward']
-    inp = feat
-    out = head(inp)
-    dists = out if isinstance(out, dict) else {"reward": out}
-    for key, dist in dists.items():
-      like = tf.cast(dist.log_prob(data[key]), tf.float32)
-      likes[key] = like
-      losses[key] = -like.mean()
-    
-    #for the discount head
-    head = self.heads["discount"]
-    inp = feat
-    out = head(inp)
-    dists = out if isinstance(out, dict) else {"discount": out}
-    for key, dist in dists.items():
-      like = tf.cast(dist.log_prob(data[key]), tf.float32)
-      likes[key] = like
-      losses[key] = -like.mean()
-
+    for name, head in self.heads.items():
+      grad_head = (name in self.config.grad_heads)
+      inp = feat if grad_head else tf.stop_gradient(feat)
+      out = head(inp)
+      dists = out if isinstance(out, dict) else {name: out}
+      for key, dist in dists.items():
+        like = tf.cast(dist.log_prob(data[key]), tf.float32)
+        likes[key] = like
+        losses[key] = -like.mean()
     model_loss = sum(
         self.config.loss_scales.get(k, 1.0) * v for k, v in losses.items())
     outs = dict(
@@ -182,21 +133,18 @@ class WorldModel(common.Module):
     last_state = {k: v[:, -1] for k, v in post.items()}
     return model_loss, last_state, outs, metrics
 
-  def imagine(self, policy, start, is_terminal, horizon): # start is basically the posterior state, it has its logits, stoch and det vectors
-    # print("---At Imagine--")
-    # print("In start: {}".format(list(start[key].shape for key in start))) 
-    #Initially start vectors are of shape 16, 50, 32, 32
-    flatten = lambda x: x.reshape([-1] + list(x.shape[2:])) # flatten the time dimensions
-    start = {k: flatten(v) for k, v in start.items()} # now of shape 800, 32, 32
+  def imagine(self, policy, start, is_terminal, horizon):
+    flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
+    start = {k: flatten(v) for k, v in start.items()}
     start['feat'] = self.rssm.get_feat(start)
     start['action'] = tf.zeros_like(policy(start['feat']).mode())
     seq = {k: [v] for k, v in start.items()}
     for _ in range(horizon):
       action = policy(tf.stop_gradient(seq['feat'][-1])).sample()
-      state = self.rssm.img_step({k: v[-1] for k, v in seq.items()}, action) # get a prior from the last state in the sequence so far and the action
+      state = self.rssm.img_step({k: v[-1] for k, v in seq.items()}, action)
       feat = self.rssm.get_feat(state)
       for key, value in {**state, 'action': action, 'feat': feat}.items():
-        seq[key].append(value) # grow the sequence
+        seq[key].append(value)
     seq = {k: tf.stack(v, 0) for k, v in seq.items()}
     if 'discount' in self.heads:
       disc = self.heads['discount'](seq['feat']).mean()
@@ -243,10 +191,10 @@ class WorldModel(common.Module):
     embed = self.encoder(data)
     states, _ = self.rssm.observe(
         embed[:6, :5], data['action'][:6, :5], data['is_first'][:6, :5])
-    recon = decoder(self.rssm.get_feat(states), data['action'][:6, :5], hor=1)[key].mode()[:6]
+    recon = decoder(self.rssm.get_feat(states))[key].mode()[:6]
     init = {k: v[:, -1] for k, v in states.items()}
     prior = self.rssm.imagine(data['action'][:6, 5:], init)
-    openl = decoder(self.rssm.get_feat(prior), data['action'][:6, 5:], hor=1)[key].mode()
+    openl = decoder(self.rssm.get_feat(prior))[key].mode()
     model = tf.concat([recon[:, :5] + 0.5, openl + 0.5], 1)
     error = (model - truth + 1) / 2
     video = tf.concat([truth, model, error], 2)
@@ -254,7 +202,7 @@ class WorldModel(common.Module):
     return video.transpose((1, 2, 0, 3, 4)).reshape((T, H, B * W, C))
 
 
-class ActorCritic(common.Module):
+class OldActorCritic(common.Module):
 
   def __init__(self, config, act_space, tfstep):
     self.config = config
@@ -287,14 +235,14 @@ class ActorCritic(common.Module):
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
     with tf.GradientTape() as actor_tape:
-      seq = world_model.imagine(self.actor, start, is_terminal, hor) # generate an imagined trajectory upto horizon H 
+      seq = world_model.imagine(self.actor, start, is_terminal, hor)
       reward = reward_fn(seq)
       seq['reward'], mets1 = self.rewnorm(reward)
       mets1 = {f'reward_{k}': v for k, v in mets1.items()}
       target, mets2 = self.target(seq)
-      actor_loss, mets3 = self.actor_loss(seq, target) # train the actor here based on teh value predictions from the target
+      actor_loss, mets3 = self.actor_loss(seq, target)
     with tf.GradientTape() as critic_tape:
-      critic_loss, mets4 = self.critic_loss(seq, target) # train the critic
+      critic_loss, mets4 = self.critic_loss(seq, target)
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
     metrics.update(**mets1, **mets2, **mets3, **mets4)
@@ -384,19 +332,3 @@ class ActorCritic(common.Module):
         for s, d in zip(self.critic.variables, self._target_critic.variables):
           d.assign(mix * s + (1 - mix) * d)
       self._updates.assign_add(1)
-
-# for name, head in self.heads.items():
-    #   # print("heyy ", name)
-    #   grad_head = (name in self.config.grad_heads)
-    #   inp = feat if grad_head else tf.stop_gradient(feat)
-    #   out = head(inp, data["action"]) if name == "decoder" else head(inp)
-    #   # print("DONE HEAD {}".format(name))
-    #   dists = out if isinstance(out, dict) else {name: out}
-    #   # print("for head {} we have {} ".format(name, list(dists.keys())))
-    #   for key, dist in dists.items(): #loss on the log probability of the true vakue being observed under the predicted distribution for all the heads
-    #     if name == "decoder":
-    #       like = tf.cast(dist.log_prob(self.multi_step_helper(data)), tf.float32)
-    #     else: like = tf.cast(dist.log_prob(data[key]), tf.float32)
-    #     likes[key] = like
-    #     losses[key] = -like.mean()
-      # print("DONE LOSS {}".format(name))

@@ -16,7 +16,10 @@ sys.path.append(str(pathlib.Path(__file__).parent.parent))
 import numpy as np
 import ruamel.yaml as yaml
 
-import agent
+if True:
+ import agent
+else: 
+  import oldagent
 import common
 
 from common import Config
@@ -98,7 +101,7 @@ def train(env, config, outputs=None):
     driver.reset()
 
   print('Create agent.')
-  agnt = agent.Agent(config, env.obs_space, env.act_space, step)
+  agnt = agent.Agent(config, env.obs_space, env.act_space, step) if True else oldagent.OldAgent(config, env.obs_space, env.act_space, step)
   dataset = iter(replay.dataset(**config.dataset))
   train_agent = common.CarryOverState(agnt.train)
   train_agent(next(dataset))
