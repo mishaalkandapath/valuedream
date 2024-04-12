@@ -228,9 +228,9 @@ class ActorCritic(common.Module):
       self._target_critic = self.critic
     self.actor_opt = common.Optimizer('actor', **self.config.actor_opt)
     self.critic_opt = common.Optimizer('critic', **self.config.critic_opt)
-    self.wm_opt = common.WMOptimizer('wm', **self.config.critic_opt, accum_steps=self.config.accum_steps)
+    self.wm_opt = common.Optimizer('wm', **self.config.critic_opt)
     self.rewnorm = common.StreamNorm(**self.config.reward_norm)
-    self.acc_gradients = [tf.Variable(tf.zeros_like(i, dtype=tf.float32), trainable=False) for i in wm.rssm.trainable_variables]
+    self.acc_gradients = None#[tf.Variable(tf.zeros_like(i, dtype=tf.float32), trainable=False) for i in wm.rssm.trainable_variables]
 
   def train(self, world_model, start, is_terminal, reward_fn):
     metrics = {}
@@ -250,12 +250,16 @@ class ActorCritic(common.Module):
               target, mets2 = self.target(seq)
               critic_loss, mets4 = self.critic_loss(seq, target)
         actor_loss, mets3 = self.actor_loss(seq, target)
-    print(self.acc_gradients[0].shape)#, world_model.rssm.trainable_variables[0].shape) 
+    #quick test
+    if self.acc_gradients is None:
+        self.acc_gradients = [tf.Variable(tf.zeros_like(i, dtype=tf.float32), trainable=False) for i in world_model.rssm.trainable_variables]
+
     #Get wm gradients wrt critic loss
     wm_critic_grads = wm_tape.gradient(critic_loss, world_model.rssm.trainable_variables)
     #Accumulate the gradients
     for i in range(len(self.acc_gradients)):
-        self.acc_gradients[i].assign_add(wm_critic_grads[i])
+        if wm_critic_grads[i] is not None:
+            self.acc_gradients[i].assign_add(wm_critic_grads[i])
         
     #Update the actor and critic BEFORE applying any wm critic loss updates
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
@@ -268,7 +272,7 @@ class ActorCritic(common.Module):
     
     #Check that we have gone the specified number of iterations before applying the accumulated grads
     if self.tfstep % self.config.prop_value_every == 0:
-        print(self.acc_gradients)
+        #print(self.acc_gradients)
         self.wm_opt.apply_accumulated_gradients(self.acc_gradients, world_model.rssm) 
 
     #metrics.update(self.wm_opt(wm_tape, critic_loss, world_model.rssm)) #old way of updating wm after each step 
