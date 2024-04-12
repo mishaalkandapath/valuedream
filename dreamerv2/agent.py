@@ -188,6 +188,7 @@ class WorldModel(common.Module):
     flatten = lambda x: x.reshape([-1] + list(x.shape[2:])) # flatten the time dimensions
     start = {k: flatten(v) for k, v in start.items()} # now of shape 800, 32, 32
     start['feat'] = self.rssm.get_feat(start)
+    print("START FEAT SHAPE::", start["feat"])
     start['action'] = tf.zeros_like(policy(start['feat']).mode())
     seq = {k: [v] for k, v in start.items()}
     for _ in range(horizon):
@@ -286,7 +287,7 @@ class ActorCritic(common.Module):
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
     with tf.GradientTape() as actor_tape:
-      print("START SHAPE::",start["feat"])
+      print("START SHAPE::",start)
       seq = world_model.imagine(self.actor, start, is_terminal, hor) # generate an imagined trajectory upto horizon H 
       reward = reward_fn(seq)
       seq['reward'], mets1 = self.rewnorm(reward)
