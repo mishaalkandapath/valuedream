@@ -169,7 +169,6 @@ class WMOptimizer(Optimizer):
     super().__init__(name, lr, eps, clip, wd, opt, wd_pattern)
     self.accum_steps = accum_steps
     self.accum_grad = None
-    self.accum_type = 'sum'
     self.train_every = train_every
 
   def __call__(self, tape, loss, modules, steps=1):
@@ -246,26 +245,3 @@ class WMOptimizer(Optimizer):
     return metrics
 
 
-# class WMOptimizer(Optimizer):
-
-#   def __init__(
-#       self, name, lr, eps=1e-4, clip=None, wd=None,
-#       opt='adam', wd_pattern=r'.*', accum_steps=1):
-#     from GradientAccumulator.accumulator import GradientAccumulator
-#     assert 0 <= wd < 1
-#     assert not clip or 1 <= clip
-#     self._name = name
-#     self._clip = clip
-#     self._wd = wd
-#     self._wd_pattern = wd_pattern
-#     self._opt = GradientAccumulator({
-#         'adam': lambda: tf.optimizers.Adam(lr, epsilon=eps),
-#         'nadam': lambda: tf.optimizers.Nadam(lr, epsilon=eps),
-#         'adamax': lambda: tf.optimizers.Adamax(lr, epsilon=eps),
-#         'sgd': lambda: tf.optimizers.SGD(lr),
-#         'momentum': lambda: tf.optimizers.SGD(lr, 0.9),
-#     }[opt](), accum_steps)
-#     self._mixed = (prec.global_policy().compute_dtype == tf.float16)
-#     if self._mixed:
-#       self._opt = prec.LossScaleOptimizer(self._opt, dynamic=True)
-#     self._once = True
