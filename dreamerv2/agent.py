@@ -379,8 +379,8 @@ class ActorCritic(common.Module):
     for i in range(1,hor): extra_mask.extend([True]*(hor-i)+[False]*i)
     batch_mask = tf.constant([True]*hor*(obslen-hor)+extra_mask)
     mask = tf.concat([batch_mask] * n_batches, axis=0)
-    print("FLATTENED MASK", mask, tf.reduce_sum(1 - tf.cast(mask, tf.int32)))
-    
+    print("FLATTENED MASK", batch_mask)
+    tf.print(tf.reduce_sum(1 - tf.cast(mask, tf.int32)))
     
     # first: remove unneeded
     
