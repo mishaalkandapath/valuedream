@@ -17,7 +17,7 @@ defaults:
   eval_eps: 1
   prefill: 10000
   pretrain: 0
-  train_every: 5
+  train_every: 1
   train_steps: 1
   expl_until: 0
   replay: {capacity: 2e6, ongoing: False, minlen: 10, maxlen: 10, prioritize_ends: True}

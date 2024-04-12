@@ -165,7 +165,7 @@ class Optimizer(tf.Module):
 class WMOptimizer(Optimizer):
   def __init__(
       self, name, lr, eps=1e-4, clip=None, wd=None,
-      opt='adam', wd_pattern=r'.*', accum_steps=1, accum_type='sum'):
+      opt='adam', wd_pattern=r'.*', accum_steps=1):
     super().__init__(name, lr, eps, clip, wd, opt, wd_pattern)
     self.accum_steps = accum_steps
     self.accum_grad = None
@@ -224,7 +224,7 @@ class WMOptimizer(Optimizer):
     metrics[f'{self._name}_grad_norm'] = norm
 
     # Apply gradients.
-    if steps % self.accum_steps:
+    if steps % self.accum_steps == 0:
       # Weight decay.
       if self._wd:
         self._apply_weight_decay(varibs)
