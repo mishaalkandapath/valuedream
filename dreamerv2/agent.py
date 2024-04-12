@@ -377,11 +377,11 @@ class ActorCritic(common.Module):
     # print("CODE FLATTENED:", code_vecs)
     # CODE VECS  Tensor("concat:0", shape=(8, 50, 2048), dtype=float32)
     # TODO: now translate the code_vecs into value predictions self.critic(code_vecs), compare this shape to target
-    code_value = self.critic(code_vecs) 
-    print("ESTIMATED VALUE OF CODE VECS ",code_value)
-    print("ESTIMATED MEAN:: ", code_value.mean())
-    # tfp.distributions.Independent("IndependentNormal_6", batch_shape=[7, 50], event_shape=[], dtype=float32)
-    critic_loss = -(dist.log_prob(code_value)).mean()
+    estimated_code_value = self.critic(code_vecs).mean()
+    print("ESTIMATED VALUE OF CODE VECS ", estimated_code_value)
+    # tfp.distributions.Independent("IndependentNormal_6", batch_shape=[8, 50], event_shape=[], dtype=float32)
+    critic_loss = -(dist.log_prob(estimated_code_value)).mean()
+    print("CRITIC_LOSS SHAPE?::", critic_loss)
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
 
