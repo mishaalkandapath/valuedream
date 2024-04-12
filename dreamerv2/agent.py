@@ -298,7 +298,7 @@ class ActorCritic(common.Module):
       actor_loss, mets3 = self.actor_loss(seq, target) # train the actor here based on teh value predictions from the target
     with tf.GradientTape() as critic_tape:
       # critic_loss, mets4 = self.critic_loss(seq, target) # train the critic
-      critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat, target)
+      critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
     metrics.update(**mets1, **mets2, **mets3, **mets4)
@@ -360,7 +360,7 @@ class ActorCritic(common.Module):
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
 
-  def critic_itervaml(self, seq, code_vecs, target):
+  def critic_itervaml(self, seq, code_vecs):
     # States:     [z0]  [z1]  [z2]   z3
     # Rewards:    [r0]  [r1]  [r2]   r3
     # Values:     [v0]  [v1]  [v2]   v3
@@ -368,6 +368,7 @@ class ActorCritic(common.Module):
     # Targets:    [t0]  [t1]  [t2]
     # Loss:        l0    l1    l2
     dist = self.critic(seq['feat'][:-1]) # TODO: why is it -1? what does that mean
+    # NOTE: should i stop gradients on the posterior? itervaml does not seem to 
     print("ESTIMATED VALUE::",dist)
     # tfp.distributions.Independent("IndependentNormal_5", batch_shape=[15, 400], event_shape=[], dtype=float32)
     print(seq['feat'][:-1]) 
@@ -377,14 +378,27 @@ class ActorCritic(common.Module):
     # print("CODE FLATTENED:", code_vecs)
     # CODE VECS  Tensor("concat:0", shape=(8, 50, 2048), dtype=float32)
     # TODO: now translate the code_vecs into value predictions self.critic(code_vecs), compare this shape to target
-    estimated_code_value = self.critic(code_vecs).mean()
+    estimated_code_value = self.critic(code_vecs).mean()  # NOTE: using expected value from post val dist, but is KL better? 
     print("ESTIMATED VALUE OF CODE VECS ", estimated_code_value)
     # tfp.distributions.Independent("IndependentNormal_6", batch_shape=[8, 50], event_shape=[], dtype=float32)
-    critic_loss = -(dist.log_prob(tf.stop_gradient(target))).mean()
-    print("CRITIC_LOSS SHAPE?::", critic_loss)
+    self.itervaml_helper(estimated_code_value)
     critic_loss = -(dist.log_prob(estimated_code_value)).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
+
+  def itervaml_helper(self, post_val):
+    # NOTE: this code won't work well if config.imag_horizon >> seqlen
+    # post_val shape = (batch, seqlen) == (16,50)
+    # output: (horizon, batch*seqlen) == (15,800)
+    hor = self.config.imag_horizon
+    # for each batch (row), 
+    row = post_val[0][:]
+    print("ROW:::", row)
+    fat_row = tf.concat([row[i:i+hor] if i <= (post_val - hor) else tf.pad(row[i:], tf.constant([[0,hor-i]]), "CONSTANT") 
+               for i in range(hor)], 0)
+    print("FAT ROW:::",fat_row)
+    # output = tf.zeros(expected_post_val.shape, dtype=tf.float32)
+    # new_images = tf.concat([tf.zeros() + expected_post_val[i:, :] for i in range(0, 5)], 0)
 
   def target(self, seq):
     # States:     [z0]  [z1]  [z2]  [z3]
