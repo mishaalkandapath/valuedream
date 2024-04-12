@@ -381,7 +381,7 @@ class ActorCritic(common.Module):
     estimated_code_value = self.critic(code_vecs).mean()  # NOTE: using expected value from post val dist, but is KL better? 
     print("ESTIMATED VALUE OF CODE VECS ", estimated_code_value)
     # tfp.distributions.Independent("IndependentNormal_6", batch_shape=[8, 50], event_shape=[], dtype=float32)
-    self.itervaml_helper(estimated_code_value)
+    reshaped_batch, mask = self.itervaml_helper(estimated_code_value)
     critic_loss = -(dist.log_prob(estimated_code_value)).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
@@ -395,9 +395,12 @@ class ActorCritic(common.Module):
 
     reshape_batch = lambda x: tf.stack([x[i:i+hor] if i <= (seqlen - hor) else tf.pad(x[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT") 
                for i in range(seqlen)]) # row/batch = (50,) -> (50,15)
+    all_batches = tf.transpose(tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0), [1,0])
     
-    all_batches = tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0)
-    print("FULL BATCH::", tf.transpose(all_batches, [1, 0]))
+    # mask -- TODO: this won't also mask random places that happen to be 1 (this is possible maybe idk)
+    mask = tf.cast(tf.equal(all_batches, 0.0), tf.bool)
+    print("MASK::", mask[:][35:50])
+    return all_batches, mask
 
   def target(self, seq):
     # States:     [z0]  [z1]  [z2]  [z3]
