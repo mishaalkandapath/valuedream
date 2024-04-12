@@ -361,7 +361,7 @@ class ActorCritic(common.Module):
 
   def critic_itervaml(self, seq, code_vecs):
     # first reshape seq["feat"][:-1] to be a vector
-    restructured_seq = self.reshape_seq(seq, code_vecs.shape[1], code_vecs.shape[0])
+    restructured_seq = self.reshape_seq(seq["feat"][:-1], code_vecs.shape[1], code_vecs.shape[0])
     
     # call the critic on it to get distribution
     
