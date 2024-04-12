@@ -166,7 +166,7 @@ class WMOptimizer(Optimizer):
   def __init__(
       self, name, lr, eps=1e-4, clip=None, wd=None,
       opt='adam', wd_pattern=r'.*', accum_steps=1, accum_type='sum'):
-    super().init(name, lr, eps, clip, wd, opt, wd_pattern)
+    super().__init__(name, lr, eps, clip, wd, opt, wd_pattern)
     self.accum_steps = accum_steps
     self.accum_grad = None
     self.accum_type = 'sum'
