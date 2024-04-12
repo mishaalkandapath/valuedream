@@ -391,12 +391,13 @@ class ActorCritic(common.Module):
     # post_val shape = (batch, seqlen) == (16,50)
     # output: (horizon, batch*seqlen) == (15,800)
     hor = self.config.imag_horizon
+    seqlen = post_val.shape[1]
     # for each batch (row), 
     row = post_val[0][:]
     print("ROW:::", row)
     print(row[47:])
-    print(tf.pad(row[47:], tf.constant([[0,hor-47]]), "CONSTANT"))
-    fat_row = tf.stack([row[i:i+hor] if i <= (post_val - hor) else tf.pad(row[i:], tf.constant([[0,hor-i]]), "CONSTANT") 
+    print(tf.pad(row[47:], tf.constant([[0,hor-(seqlen - 47)]]), "CONSTANT"))
+    fat_row = tf.stack([row[i:i+hor] if i <= (seqlen - hor) else tf.pad(row[i:], tf.constant([[0,hor-i]]), "CONSTANT") 
                for i in range(hor)])
     print("FAT ROW:::",fat_row)
     # output = tf.zeros(expected_post_val.shape, dtype=tf.float32)
