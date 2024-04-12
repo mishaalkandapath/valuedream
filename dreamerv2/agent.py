@@ -392,16 +392,13 @@ class ActorCritic(common.Module):
     # output: (horizon, batch*seqlen) == (15,800)
     hor = self.config.imag_horizon
     seqlen = post_val.shape[1]
-    # for each batch (row), 
-    row = post_val[0][:]
-    print("ROW:::", row)
-    print(row[47:])
-    print(tf.pad(row[47:], tf.constant([[0,hor-(seqlen - 47)]]), "CONSTANT"))
-    fat_row = tf.stack([row[i:i+hor] if i <= (seqlen - hor) else tf.pad(row[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT") 
-               for i in range(seqlen)])
-    print("FAT ROW:::",fat_row)
+
+    reshape_batch = lambda x: tf.stack([x[i:i+hor] if i <= (seqlen - hor) else tf.pad(x[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT") 
+               for i in range(seqlen)]) # row = (50,) -> (50,15)
+    
     # output = tf.zeros(expected_post_val.shape, dtype=tf.float32)
-    # new_images = tf.concat([tf.zeros() + expected_post_val[i:, :] for i in range(0, 5)], 0)
+    new_images = tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0)
+    print("FULL BATCH??",new_images)
 
   def target(self, seq):
     # States:     [z0]  [z1]  [z2]  [z3]
