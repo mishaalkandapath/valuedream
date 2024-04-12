@@ -110,6 +110,7 @@ class WorldModel(common.Module):
       assert name in self.heads, name
     self.model_opt = common.Optimizer('model', **config.model_opt)
     self.reg_measures = {"auto_corr":[], "norm":[]}
+    self.post_feat = None
 
   def train(self, data, state=None):
     with tf.GradientTape() as model_tape:
@@ -148,7 +149,7 @@ class WorldModel(common.Module):
     assert len(kl_loss.shape) == 0
     likes = {}
     losses = {'kl': kl_loss}
-    feat = self.rssm.get_feat(post)
+    feat = self.post_feat = self.rssm.get_feat(post)
     avgnorm = tf.reduce_mean(tf.norm(tf.stop_gradient(tf.identity(feat)), axis=2))
     
     for name, head in self.heads.items():
@@ -176,7 +177,7 @@ class WorldModel(common.Module):
     metrics['prior_ent'] = self.rssm.get_dist(prior).entropy().mean()
     metrics['post_ent'] = self.rssm.get_dist(post).entropy().mean()
     metrics["avg_norm"] = avgnorm
-    last_state = {k: v[:, -1] for k, v in post.items()}
+    last_state = {k: v[:, -1] for k, v in post.items()}   # NOTE: why is this the last state? print the shape of the v
     return model_loss, last_state, outs, metrics
 
   def imagine(self, policy, start, is_terminal, horizon): # start is basically the posterior state, it has its logits, stoch and det vectors
@@ -289,9 +290,11 @@ class ActorCritic(common.Module):
       seq['reward'], mets1 = self.rewnorm(reward)
       mets1 = {f'reward_{k}': v for k, v in mets1.items()}
       target, mets2 = self.target(seq)
+      print("TARGET::", target)
       actor_loss, mets3 = self.actor_loss(seq, target) # train the actor here based on teh value predictions from the target
     with tf.GradientTape() as critic_tape:
-      critic_loss, mets4 = self.critic_loss(seq, target) # train the critic
+      # critic_loss, mets4 = self.critic_loss(seq, target) # train the critic
+      critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
     metrics.update(**mets1, **mets2, **mets3, **mets4)
@@ -350,6 +353,24 @@ class ActorCritic(common.Module):
     target = tf.stop_gradient(target)
     weight = tf.stop_gradient(seq['weight'])
     critic_loss = -(dist.log_prob(target) * weight[:-1]).mean()
+    metrics = {'critic': dist.mode().mean()}
+    return critic_loss, metrics
+
+  def critic_itervaml(self, seq, code_vecs):
+    # States:     [z0]  [z1]  [z2]   z3
+    # Rewards:    [r0]  [r1]  [r2]   r3
+    # Values:     [v0]  [v1]  [v2]   v3
+    # Weights:    [ 1]  [w1]  [w2]   w3
+    # Targets:    [t0]  [t1]  [t2]
+    # Loss:        l0    l1    l2
+    dist = self.critic(seq['feat'][:-1])
+    print("ESTIMATED VALUE::",dist)
+    print(seq['feat'][:-1])
+    print("CODE VECS ", code_vecs)
+    # TODO: now translate the code_vecs into value predictions self.critic(code_vecs), compare this shape to target
+    code_value = self.critic(code_vecs[:-1]) # TODO: why is it -1? what does that mean
+    print("ESTIMATED VALUE OF CODE VECS ",code_value)
+    critic_loss = -(dist.log_prob(code_value)).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
 
