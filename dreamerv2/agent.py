@@ -373,12 +373,13 @@ class ActorCritic(common.Module):
     print(seq['feat'][:-1]) 
     # Tensor("strided_slice_74:0", shape=(15, 400, 2048), dtype=float32)
     print("CODE VECS ", code_vecs)
-    code_vecs = code_vecs.reshape([-1] + list(code_vecs.shape[2:])) # flatten the time dimensions
-    print("CODE FLATTENED:", code_vecs)
+    # code_vecs = code_vecs.reshape([-1] + list(code_vecs.shape[2:])) # flatten the time dimensions
+    # print("CODE FLATTENED:", code_vecs)
     # CODE VECS  Tensor("concat:0", shape=(8, 50, 2048), dtype=float32)
     # TODO: now translate the code_vecs into value predictions self.critic(code_vecs), compare this shape to target
     code_value = self.critic(code_vecs) 
     print("ESTIMATED VALUE OF CODE VECS ",code_value)
+    print("ESTIMATED MEAN:: ", code_value.mean())
     # tfp.distributions.Independent("IndependentNormal_6", batch_shape=[7, 50], event_shape=[], dtype=float32)
     critic_loss = -(dist.log_prob(code_value)).mean()
     metrics = {'critic': dist.mode().mean()}
