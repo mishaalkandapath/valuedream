@@ -394,11 +394,10 @@ class ActorCritic(common.Module):
     seqlen = post_val.shape[1]
 
     reshape_batch = lambda x: tf.stack([x[i:i+hor] if i <= (seqlen - hor) else tf.pad(x[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT") 
-               for i in range(seqlen)]) # row = (50,) -> (50,15)
+               for i in range(seqlen)]) # row/batch = (50,) -> (50,15)
     
-    # output = tf.zeros(expected_post_val.shape, dtype=tf.float32)
-    new_images = tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0)
-    print("FULL BATCH??",new_images)
+    all_batches = tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0)
+    print("FULL BATCH::", tf.transpose(all_batches, [1, 0]))
 
   def target(self, seq):
     # States:     [z0]  [z1]  [z2]  [z3]
