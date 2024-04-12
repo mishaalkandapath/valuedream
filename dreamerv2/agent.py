@@ -372,15 +372,20 @@ class ActorCritic(common.Module):
     pass
 
   def reshape_seq(self, seq, obslen, n_batches):
+    flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
+    flat_seq = flatten(seq)
+    print("FLATTENED", flat_seq)
+    
+    
     # first: remove unneeded
-    hor = self.config.imag_horizon
+    # hor = self.config.imag_horizon
     
-    row = seq[:][0][:]
-    print("ROWWWW", row)
+    # row = seq[:][0][:]
+    # print("ROWWWW", row)
     
-    reshape_batch = lambda x: tf.concat([x[i:i+hor] if i <= (obslen - hor) else x[i:] for i in range(obslen)]) # row/batch = (50,) -> (50,15)
-    all_batches = tf.concat([reshape_batch(seq[i*obslen:(i+1)*obslen]) for i in range(n_batches)], 0)
-    return all_batches
+    # reshape_batch = lambda x: tf.concat([x[i:i+hor] if i <= (obslen - hor) else x[i:] for i in range(obslen)]) # row/batch = (50,) -> (50,15)
+    # all_batches = tf.concat([reshape_batch(seq[i*obslen:(i+1)*obslen]) for i in range(n_batches)], 0)
+    # return all_batches
   
   def critic_itervaml_attempt1(self, seq, code_vecs):
     # States:     [z0]  [z1]  [z2]   z3
