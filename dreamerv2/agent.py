@@ -360,15 +360,39 @@ class ActorCritic(common.Module):
     return critic_loss, metrics
 
   def critic_itervaml(self, seq, code_vecs):
+    # first reshape seq["feat"][:-1] to be a vector
+    restructured_seq = self.reshape_seq(seq, code_vecs.shape[1], code_vecs.shape[0])
+    
+    # call the critic on it to get distribution
+    
+    # next reshape code_vecs to be a vector, call dist on it, get mean
+    
+    
+    # -log_prob.mean()
+    pass
+
+  def reshape_seq(self, seq, obslen, n_batches):
+    # first: remove unneeded
+    hor = self.config.imag_horizon
+    
+    row = seq[:][0][:]
+    print("ROWWWW", row)
+    
+    reshape_batch = lambda x: tf.concat([x[i:i+hor] if i <= (obslen - hor) else x[i:] for i in range(obslen)]) # row/batch = (50,) -> (50,15)
+    all_batches = tf.concat([reshape_batch(seq[i*obslen:(i+1)*obslen]) for i in range(n_batches)], 0)
+    return all_batches
+  
+  def critic_itervaml_attempt1(self, seq, code_vecs):
     # States:     [z0]  [z1]  [z2]   z3
     # Rewards:    [r0]  [r1]  [r2]   r3
     # Values:     [v0]  [v1]  [v2]   v3
     # Weights:    [ 1]  [w1]  [w2]   w3
     # Targets:    [t0]  [t1]  [t2]
     # Loss:        l0    l1    l2
+        
     dist = self.critic(seq['feat'][:-1]) # TODO: why is it -1? what does that mean
     # NOTE: should i stop gradients on the posterior? itervaml does not seem to 
-    print("ESTIMATED VALUE::",dist)
+    print("ESTIMATED VALUE::", dist)
     # tfp.distributions.Independent("IndependentNormal_5", batch_shape=[15, 400], event_shape=[], dtype=float32)
     print(seq['feat'][:-1]) 
     # Tensor("strided_slice_74:0", shape=(15, 400, 2048), dtype=float32)
