@@ -223,12 +223,11 @@ class WMOptimizer(Optimizer):
       grads, _ = tf.clip_by_global_norm(grads, self._clip, norm)
     metrics[f'{self._name}_grad_norm'] = norm
 
-    # Weight decay.
-    if self._wd:
-      self._apply_weight_decay(varibs)
-
     # Apply gradients.
     if steps % self.accum_steps:
+      # Weight decay.
+      if self._wd:
+        self._apply_weight_decay(varibs)
       self._opt.apply_gradients(
           zip(grads, varibs),
           experimental_aggregate_gradients=False)
