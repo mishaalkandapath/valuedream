@@ -372,16 +372,17 @@ class ActorCritic(common.Module):
     pass
 
   def reshape_seq(self, seq, obslen, n_batches):
+    print(seq, obslen, n_batches)
     hor = self.config.imag_horizon
     flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
     flat_seq = flatten(seq)
     extra_mask=[]
     for i in range(1,hor): extra_mask.extend([True]*(hor-i)+[False]*i)
+    print(len(extra_mask))
     batch_mask = tf.constant([True]*hor*(obslen-hor)+extra_mask)
     mask = tf.concat([batch_mask] * n_batches, axis=0)
     print("FLATTENED MASK", batch_mask)
-    tf.print(tf.reduce_sum(1 - tf.cast(mask, tf.int32)))
-    
+        
     # first: remove unneeded
     
     # row = seq[:][0][:]
