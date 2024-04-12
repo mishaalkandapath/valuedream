@@ -111,7 +111,7 @@ crafter:
   log_keys_sum: '^log_reward$'
   rssm: {hidden: 128, deter: 128}
   discount: 0.999
-  prefill: 0
+  # prefill: 0
   model_opt.lr: 1e-4
   actor_opt.lr: 1e-4
   critic_opt.lr: 1e-4
