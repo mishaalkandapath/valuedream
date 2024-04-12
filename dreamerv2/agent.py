@@ -258,15 +258,15 @@ class ActorCritic(common.Module):
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
 
     #Printing weights for debugging
-    tf.print('pre-update')
-    model_weights = [var for var in world_model.rssm.trainable_variables]
-    tf.print(model_weights[0])
+    # tf.print('pre-update')
+    # model_weights = [var for var in world_model.rssm.trainable_variables]
+    # tf.print(model_weights[0])
     
     metrics.update(self.wm_opt(wm_tape, critic_loss, world_model.rssm, self.tfstep)) 
     
-    tf.print('post-update')
-    model_weights = [var for var in world_model.rssm.trainable_variables]
-    tf.print(model_weights[0])
+    # tf.print('post-update')
+    # model_weights = [var for var in world_model.rssm.trainable_variables]
+    # tf.print(model_weights[0])
     
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.
