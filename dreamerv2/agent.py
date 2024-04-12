@@ -397,7 +397,7 @@ class ActorCritic(common.Module):
     print("ROW:::", row)
     print(row[47:])
     print(tf.pad(row[47:], tf.constant([[0,hor-(seqlen - 47)]]), "CONSTANT"))
-    fat_row = tf.stack([row[i:i+hor] if i <= (seqlen - hor) else tf.pad(row[i:], tf.constant([[0,hor-i]]), "CONSTANT") 
+    fat_row = tf.stack([row[i:i+hor] if i <= (seqlen - hor) else tf.pad(row[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT") 
                for i in range(hor)])
     print("FAT ROW:::",fat_row)
     # output = tf.zeros(expected_post_val.shape, dtype=tf.float32)
