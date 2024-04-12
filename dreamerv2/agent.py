@@ -150,6 +150,7 @@ class WorldModel(common.Module):
     likes = {}
     losses = {'kl': kl_loss}
     feat = self.post_feat = self.rssm.get_feat(post)
+    print("FRESH POSTERIOR::", feat)
     avgnorm = tf.reduce_mean(tf.norm(tf.stop_gradient(tf.identity(feat)), axis=2))
     
     for name, head in self.heads.items():
@@ -285,12 +286,14 @@ class ActorCritic(common.Module):
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
     with tf.GradientTape() as actor_tape:
+      print("START SHAPE::",start["feat"])
       seq = world_model.imagine(self.actor, start, is_terminal, hor) # generate an imagined trajectory upto horizon H 
       reward = reward_fn(seq)
       seq['reward'], mets1 = self.rewnorm(reward)
       mets1 = {f'reward_{k}': v for k, v in mets1.items()}
       target, mets2 = self.target(seq)
       print("TARGET::", target)
+      # TARGET:: Tensor("stack_5:0", shape=(15, 400), dtype=float32)
       actor_loss, mets3 = self.actor_loss(seq, target) # train the actor here based on teh value predictions from the target
     with tf.GradientTape() as critic_tape:
       # critic_loss, mets4 = self.critic_loss(seq, target) # train the critic
@@ -363,13 +366,17 @@ class ActorCritic(common.Module):
     # Weights:    [ 1]  [w1]  [w2]   w3
     # Targets:    [t0]  [t1]  [t2]
     # Loss:        l0    l1    l2
-    dist = self.critic(seq['feat'][:-1])
+    dist = self.critic(seq['feat'][:-1]) # TODO: why is it -1? what does that mean
     print("ESTIMATED VALUE::",dist)
-    print(seq['feat'][:-1])
+    # tfp.distributions.Independent("IndependentNormal_5", batch_shape=[15, 400], event_shape=[], dtype=float32)
+    print(seq['feat'][:-1]) 
+    # Tensor("strided_slice_74:0", shape=(15, 400, 2048), dtype=float32)
     print("CODE VECS ", code_vecs)
+    # CODE VECS  Tensor("concat:0", shape=(8, 50, 2048), dtype=float32)
     # TODO: now translate the code_vecs into value predictions self.critic(code_vecs), compare this shape to target
-    code_value = self.critic(code_vecs[:-1]) # TODO: why is it -1? what does that mean
+    code_value = self.critic(code_vecs) 
     print("ESTIMATED VALUE OF CODE VECS ",code_value)
+    # tfp.distributions.Independent("IndependentNormal_6", batch_shape=[7, 50], event_shape=[], dtype=float32)
     critic_loss = -(dist.log_prob(code_value)).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics

@@ -1,4 +1,4 @@
-name: namedoesnotexist
+name: dreamerenv
 channels:
   - conda-forge
   - defaults
