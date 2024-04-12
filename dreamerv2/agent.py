@@ -381,12 +381,12 @@ class ActorCritic(common.Module):
     estimated_code_value = self.critic(code_vecs).mean()  # NOTE: using expected value from post val dist, but is KL better? 
     print("ESTIMATED VALUE OF CODE VECS ", estimated_code_value)
     # tfp.distributions.Independent("IndependentNormal_6", batch_shape=[8, 50], event_shape=[], dtype=float32)
-    reshaped_batch, mask = self.itervaml_helper(estimated_code_value)
+    reshaped_batch = self.itervaml_helper(estimated_code_value)
     neg_loglike = -(dist.log_prob(reshaped_batch))
-    print("NEGLOGLIKE::", neg_loglike, tf.where(mask, neg_loglike, 0))
-    if tf.reduce_any(tf.math.is_inf(tf.where(mask, neg_loglike, 0))): print("HELP THERE WAS INFS LEFT")
-    else: print("NOPE, NO INFS")
-    critic_loss = tf.where(mask, neg_loglike, 0).mean()
+    
+    masked = tf.where(tf.is_nan(neg_loglike), neg_loglike, 0)
+    print("NEGLOGLIKE::", neg_loglike, masked)
+    critic_loss = masked.mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
 
@@ -397,12 +397,9 @@ class ActorCritic(common.Module):
     hor = self.config.imag_horizon
     seqlen = post_val.shape[1]
     reshape_batch = lambda x: tf.stack([x[i:i+hor] if i <= (seqlen - hor) 
-                                        else tf.pad(x[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT", constant_values=-np.inf) for i in range(seqlen)]) # row/batch = (50,) -> (50,15)
+                                        else tf.pad(x[i:], tf.constant([[0,hor-(seqlen-i)]]), "CONSTANT", constant_values=float('nan')) for i in range(seqlen)]) # row/batch = (50,) -> (50,15)
     all_batches = tf.transpose(tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0), [1,0])
-    
-    # mask
-    mask = tf.cast(tf.equal(all_batches, -np.inf), tf.bool)
-    return all_batches, mask
+    return all_batches
 
   def target(self, seq):
     # States:     [z0]  [z1]  [z2]  [z3]
