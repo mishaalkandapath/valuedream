@@ -298,7 +298,7 @@ class ActorCritic(common.Module):
       actor_loss, mets3 = self.actor_loss(seq, target) # train the actor here based on teh value predictions from the target
     with tf.GradientTape() as critic_tape:
       # critic_loss, mets4 = self.critic_loss(seq, target) # train the critic
-      critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
+      critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat, target)
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
     metrics.update(**mets1, **mets2, **mets3, **mets4)
@@ -360,7 +360,7 @@ class ActorCritic(common.Module):
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
 
-  def critic_itervaml(self, seq, code_vecs):
+  def critic_itervaml(self, seq, code_vecs, target):
     # States:     [z0]  [z1]  [z2]   z3
     # Rewards:    [r0]  [r1]  [r2]   r3
     # Values:     [v0]  [v1]  [v2]   v3
@@ -380,8 +380,9 @@ class ActorCritic(common.Module):
     estimated_code_value = self.critic(code_vecs).mean()
     print("ESTIMATED VALUE OF CODE VECS ", estimated_code_value)
     # tfp.distributions.Independent("IndependentNormal_6", batch_shape=[8, 50], event_shape=[], dtype=float32)
-    critic_loss = -(dist.log_prob(estimated_code_value)).mean()
+    critic_loss = -(dist.log_prob(tf.stop_gradient(target))).mean()
     print("CRITIC_LOSS SHAPE?::", critic_loss)
+    critic_loss = -(dist.log_prob(estimated_code_value)).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
 
