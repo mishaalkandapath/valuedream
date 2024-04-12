@@ -150,7 +150,6 @@ class WorldModel(common.Module):
     likes = {}
     losses = {'kl': kl_loss}
     feat = self.post_feat = self.rssm.get_feat(post)
-    print("FRESH POSTERIOR::", feat)
     avgnorm = tf.reduce_mean(tf.norm(tf.stop_gradient(tf.identity(feat)), axis=2))
     
     for name, head in self.heads.items():
@@ -188,7 +187,6 @@ class WorldModel(common.Module):
     flatten = lambda x: x.reshape([-1] + list(x.shape[2:])) # flatten the time dimensions
     start = {k: flatten(v) for k, v in start.items()} # now of shape 800, 32, 32
     start['feat'] = self.rssm.get_feat(start)
-    print("START FEAT SHAPE::", start["feat"])
     start['action'] = tf.zeros_like(policy(start['feat']).mode())
     seq = {k: [v] for k, v in start.items()}
     for _ in range(horizon):
@@ -384,7 +382,7 @@ class ActorCritic(common.Module):
     reshaped_batch = self.itervaml_helper(estimated_code_value)
     neg_loglike = -(dist.log_prob(reshaped_batch))
     
-    masked = tf.where(tf.math.is_nan(neg_loglike), neg_loglike, 0.0)
+    masked = tf.where(tf.math.is_nan(neg_loglike), 0.0, neg_loglike)
     tf.debugging.check_numerics(masked, "post masking")
     print("NEGLOGLIKE::", neg_loglike, masked)
     critic_loss = masked.mean()
