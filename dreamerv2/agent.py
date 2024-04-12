@@ -385,7 +385,7 @@ class ActorCritic(common.Module):
     neg_loglike = -(dist.log_prob(reshaped_batch))
     
     masked = tf.where(tf.math.is_nan(neg_loglike), neg_loglike, 0.0)
-    tf.debugging.check_numerics(reshaped_batch, "post masking")
+    tf.debugging.check_numerics(masked, "post masking")
     print("NEGLOGLIKE::", neg_loglike, masked)
     critic_loss = masked.mean()
     metrics = {'critic': dist.mode().mean()}
