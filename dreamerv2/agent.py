@@ -225,7 +225,7 @@ class ActorCritic(common.Module):
       self._target_critic = self.critic
     self.actor_opt = common.Optimizer('actor', **self.config.actor_opt)
     self.critic_opt = common.Optimizer('critic', **self.config.critic_opt)
-    self.wm_opt = common.WMOptimizer('wm', **self.config.critic_opt, accum_steps=self.config.accum_steps, train_every=self.config.train_every)
+    self.wm_opt = common.WMOptimizer('wm', **self.config.critic_opt, accum_steps=self.config.accum_steps)
     self.rewnorm = common.StreamNorm(**self.config.reward_norm)
 
   def train(self, world_model, start, is_terminal, reward_fn):
@@ -259,7 +259,7 @@ class ActorCritic(common.Module):
     # model_weights = [var for var in world_model.rssm.trainable_variables]
     # tf.print(model_weights[0])
     
-    metrics.update(self.wm_opt(wm_tape, critic_loss, world_model.rssm, self.tfstep)) 
+    metrics.update(self.wm_opt(wm_tape, critic_loss, world_model.rssm)) 
     
     # tf.print('post-update')
     # model_weights = [var for var in world_model.rssm.trainable_variables]
@@ -267,8 +267,6 @@ class ActorCritic(common.Module):
     
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.
-    #w2 = seq['weight']
-    #tf.print(tf.reduce_all(tf.equal(w1, w2)))
     return metrics
 
   def actor_loss(self, seq, target):

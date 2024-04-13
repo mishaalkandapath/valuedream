@@ -165,14 +165,13 @@ class Optimizer(tf.Module):
 class WMOptimizer(Optimizer):
   def __init__(
       self, name, lr, eps=1e-4, clip=None, wd=None,
-      opt='adam', wd_pattern=r'.*', accum_steps=1, train_every=1):
+      opt='adam', wd_pattern=r'.*', accum_steps=1):
     super().__init__(name, lr, eps, clip, wd, opt, wd_pattern)
     self.accum_steps = accum_steps
     self.accum_grad = None
-    self.train_every = train_every
-    self.first_run = True  # flag that flips back and forth to re-accumulate grads
+    self.steps = 0
 
-  def __call__(self, tape, loss, modules, steps=1):
+  def __call__(self, tape, loss, modules):
     assert loss.dtype is tf.float32, (self._name, loss.dtype)
     assert len(loss.shape) == 0, (self._name, loss.shape)
     metrics = {}
@@ -224,26 +223,23 @@ class WMOptimizer(Optimizer):
       grads, _ = tf.clip_by_global_norm(grads, self._clip, norm)
     metrics[f'{self._name}_grad_norm'] = norm
 
+    if self.steps == 0:
+      self.accum_grad = grads
+    else:
+      assert(len(self.accum_grad) == len(grads))
+      new_grad_list = [grads[i] + self.accum_grad[i] for i in range(len(grads))]
+      self.accum_grad = new_grad_list
+    
+    self.steps += 1
+
     # Apply gradients.
-    if steps % (self.accum_steps * self.train_every) == 0:
+    if self.steps % self.accum_steps == 0:
       # Weight decay.
       if self._wd:
         self._apply_weight_decay(varibs)
       self._opt.apply_gradients(
           zip(self.accum_grad, varibs),
           experimental_aggregate_gradients=False)
-      
-      # reset accumulation
-      self.first_run = True
-    else:
-      if self.first_run:
-        self.accum_grad = grads
-        self.first_run = False
-      else:
-        assert(not self.first_run)
-        assert(len(self.accum_grad) == len(grads))
-        new_grad_list = [grads[i] + self.accum_grad[i] for i in range(len(grads))]
-        self.accum_grad = new_grad_list
 
     return metrics
 
