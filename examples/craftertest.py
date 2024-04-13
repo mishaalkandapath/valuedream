@@ -1,27 +1,28 @@
 import sys
-sys.path.append("/home/mrmackamoo/valuedream")
+sys.path.append("/home/valuedream") #"/home/leesophie99/projects/valuedream") # "/home/mishaal/valuedream")
 import gym
 import crafter
 import dreamerv2.api as dv2
+import tensorflow as tf
 
 config = dv2.defaults.update({
-    'logdir': '~/logdir/crafter',
+    'logdir': '~/logdir/crafter_itervaml',
     'log_every': 1e3,
-    'train_every': 10,
-    'prefill': 1e5,
+    'train_every': 6,
+    'prefill': 1e4,
     'actor_ent': 3e-3,
     'loss_scales.kl': 1.0,
     'discount': 0.99,
+    "steps": 1e6
 }).parse_flags()
 
 env = gym.make('CrafterReward-v1')  # Or CrafterNoReward-v1
 env = crafter.Recorder(
-  env, '~/logdir/crafter1',
+  env, '~/logdir/crafter_itervaml_r',
   save_stats=True,
   save_video=False,
   save_episode=False,
 )
-
 dv2.train(env, config)
 
 # obs = env.reset()
