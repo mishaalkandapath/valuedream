@@ -369,8 +369,16 @@ class ActorCritic(common.Module):
     # next reshape code_vecs to be a vector, call dist on it, get mean
     restructured_post = self.itervaml_helper(code_vecs)
     print("RESTRUCTURED POST", restructured_post)
+    
     # -log_prob.mean()
-    pass
+    # NOTE: using expected value from post val dist, but is KL better? 
+    estimated_code_value = self.critic(restructured_post).mean() 
+    neg_loglike = -(dist.log_prob(estimated_code_value))
+    
+    print("NEGLOGLIKE::", neg_loglike)
+    critic_loss = neg_loglike.mean()
+    metrics = {'critic': dist.mode().mean()}
+    return critic_loss, metrics
 
   def reshape_seq(self, seq, obslen, n_batches):
     hor = self.config.imag_horizon
