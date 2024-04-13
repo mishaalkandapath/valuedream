@@ -9,7 +9,7 @@ config = dv2.defaults.update({
     'logdir': '~/logdir/crafter_testing',
     'log_every': 1e3,
     'train_every': 6,
-    'prefill': 1e2,
+    'prefill': 1e6,
     'actor_ent': 3e-3,
     'loss_scales.kl': 1.0,
     'discount': 0.99,
