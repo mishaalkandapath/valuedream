@@ -330,6 +330,57 @@ class ActorCritic(common.Module):
     critic_loss = -(dist.log_prob(target) * weight[:-1]).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
+  
+  def critic_itervaml(self, seq, code_vecs):
+    weight = seq['weight']
+    reshape_weights = self.reshape_seq(weight[:-1])
+    
+    # first reshape seq["feat"][:-1] to be a vector
+    restructured_seq = self.reshape_seq(seq["feat"][:-1], code_vecs.shape[1], code_vecs.shape[0])
+    # call the critic on it to get distribution
+    # print("RESTRUCTURED SEQ", restructured_seq)
+    dist = self.critic(restructured_seq)
+    
+    # next reshape code_vecs to be a vector, call dist on it, get mean
+    restructured_post = self.itervaml_helper(code_vecs)
+    # print("RESTRUCTURED POST", restructured_post)
+    
+    # -log_prob.mean()
+    # NOTE: using expected value from post val dist, but is KL better? 
+    estimated_code_value = self.critic(restructured_post).mean() 
+    neg_loglike = -(dist.log_prob(estimated_code_value * reshape_weights))
+    
+    # print("NEGLOGLIKE::", neg_loglike)
+    critic_loss = neg_loglike.mean()
+    metrics = {'critic': dist.mode().mean()}
+    return critic_loss, metrics
+
+  def reshape_seq(self, seq, obslen, n_batches):
+    hor = self.config.imag_horizon
+    flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
+    flat_seq = flatten(seq)
+    accum_seq = None
+    for i in range(n_batches):
+      start = i*hor*obslen
+      batch_accum = flat_seq[start:start + hor*(obslen-hor)]
+      start += hor*(obslen-hor)
+      extra_seq = [flat_seq[start+(j*hor):start+(j*hor)+(hor-j)] for j in range(hor)]
+      
+      if accum_seq is None: accum_seq = tf.concat([batch_accum, tf.concat(extra_seq,0)],0)
+      else: accum_seq = tf.concat([accum_seq, batch_accum, tf.concat(extra_seq,0)],0)
+    # shape = (obslen*n_batches*hor - the unneeded parts, 2048)
+    return accum_seq
+
+  def itervaml_helper(self, post_val):
+    # NOTE: this code won't work well if config.imag_horizon >> seqlen
+    # post_val shape = (batch, seqlen) == (16,50,2048)
+    # output: (horizon, batch*seqlen) == (obslen*n_batches*hor - extra,2048)
+    hor = self.config.imag_horizon
+    seqlen = post_val.shape[1]
+    reshape_batch = lambda x: tf.concat([x[i:i+hor] if i <= (seqlen - hor) 
+                                        else x[i:] for i in range(seqlen)],0) # row/batch = (50,) -> (50*15 - extra)
+    all_batches = tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0)
+    return all_batches
 
   def target(self, seq):
     # States:     [z0]  [z1]  [z2]  [z3]
