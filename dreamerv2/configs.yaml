@@ -27,7 +27,7 @@ defaults:
   log_keys_mean: '^$'
   log_keys_max: '^$'
   precision: 16
-  jit: True
+  jit: False
 
   # Agent
   clip_rewards: tanh
