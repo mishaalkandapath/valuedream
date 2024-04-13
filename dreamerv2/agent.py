@@ -376,10 +376,10 @@ class ActorCritic(common.Module):
     hor = self.config.imag_horizon
     flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
     flat_seq = flatten(seq)
-    extra_mask=[]
+    extra_mask=[]  # hor*(hor-1)
     for i in range(1,hor): extra_mask.extend([True]*(hor-i)+[False]*i)
-    print(len(extra_mask))
-    batch_mask = tf.constant([True]*hor*(obslen-hor)+extra_mask)
+    print(len(extra_mask), hor*(obslen-hor))
+    batch_mask = tf.constant([True]*hor*(obslen-hor+1)+extra_mask)
     mask = tf.concat([batch_mask] * n_batches, axis=0)
     print("FLATTENED MASK", batch_mask)
         
