@@ -33,7 +33,7 @@ def main():
   #    pathlib.Path(sys.argv[0]).parent / 'configs.yaml').read_text())
   yaml_loader = yaml.YAML(typ="safe", pure=True)
   # configs = yaml_loader.load((pathlib.Path('sys.argv[0]').parent / 'configs.yaml').read_text())
-  configs = yaml_loader.load(pathlib.Path('dreamerv2/configs.yaml').read_text())
+  configs = yaml_loader.load(pathlib.Path('dreamerv2/expconfigs.yaml').read_text())
   parsed, remaining = common.Flags(configs=['defaults']).parse(known_only=True)
   config = common.Config(configs['defaults'])
   config = config.update(configs['crafter'])

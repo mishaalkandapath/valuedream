@@ -170,6 +170,7 @@ class WMOptimizer(Optimizer):
     self.accum_steps = accum_steps
     self.accum_grad = None
     self.train_every = train_every
+    self.first_run = True  # flag that flips back and forth to re-accumulate grads
 
   def __call__(self, tape, loss, modules, steps=1):
     assert loss.dtype is tf.float32, (self._name, loss.dtype)
@@ -224,20 +225,22 @@ class WMOptimizer(Optimizer):
     metrics[f'{self._name}_grad_norm'] = norm
 
     # Apply gradients.
-    if steps % self.accum_steps * self.train_every == 0:
+    if steps % (self.accum_steps * self.train_every) == 0:
       # Weight decay.
       if self._wd:
         self._apply_weight_decay(varibs)
       self._opt.apply_gradients(
-          zip(grads, varibs),
+          zip(self.accum_grad, varibs),
           experimental_aggregate_gradients=False)
       
       # reset accumulation
-      self.accum_grad = None
+      self.first_run = True
     else:
-      if self.accum_grad is None:
+      if self.first_run:
         self.accum_grad = grads
+        self.first_run = False
       else:
+        assert(not self.first_run)
         assert(len(self.accum_grad) == len(grads))
         new_grad_list = [grads[i] + self.accum_grad[i] for i in range(len(grads))]
         self.accum_grad = new_grad_list
