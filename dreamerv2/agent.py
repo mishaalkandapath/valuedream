@@ -117,6 +117,7 @@ class WorldModel(common.Module):
     likes = {}
     losses = {'kl': kl_loss}
     feat = self.rssm.get_feat(post)
+    self.post_feat = tf.stop_gradient(feat)
     for name, head in self.heads.items():
       grad_head = (name in self.config.grad_heads)
       inp = feat if grad_head else tf.stop_gradient(feat)
