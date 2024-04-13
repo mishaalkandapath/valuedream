@@ -11,11 +11,11 @@ defaults:
   atari_grayscale: True
   time_limit: 0
   action_repeat: 1
-  steps: 1e7
+  steps: 1e6
   log_every: 1e4
   eval_every: 1e5
   eval_eps: 1
-  prefill: 1e5
+  prefill: 1e4
   pretrain: 1
   train_every: 10
   train_steps: 1

@@ -115,7 +115,7 @@ class WorldModel(common.Module):
   def train(self, data, state=None):
     with tf.GradientTape() as model_tape:
       model_loss, state, outputs, metrics = self.loss(data, state)
-    # print("DONE INFERENCE PART")
+    print("DONE INFERENCE PART")
     modules = [self.encoder, self.rssm, *self.heads.values()]
     metrics.update(self.model_opt(model_tape, model_loss, modules))
     # print("DONE UPDATE")
