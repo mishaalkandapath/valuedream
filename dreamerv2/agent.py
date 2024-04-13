@@ -367,8 +367,8 @@ class ActorCritic(common.Module):
     dist = self.critic(restructured_seq)
     
     # next reshape code_vecs to be a vector, call dist on it, get mean
-    self.itervaml_helper(code_vecs)
-    
+    restructured_post = self.itervaml_helper(code_vecs)
+    print("RESTRUCTURED POST", restructured_post)
     # -log_prob.mean()
     pass
 
@@ -426,11 +426,9 @@ class ActorCritic(common.Module):
     # output: (horizon, batch*seqlen) == (obslen*n_batches*hor - extra,2048)
     hor = self.config.imag_horizon
     seqlen = post_val.shape[1]
-    y = post_val[0]
     reshape_batch = lambda x: tf.concat([x[i:i+hor] if i <= (seqlen - hor) 
                                         else x[i:] for i in range(seqlen)],0) # row/batch = (50,) -> (50*15 - extra)
-    print("RESHAPED BATCH", reshape_batch(y))
-    all_batches = tf.transpose(tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0), [1,0])
+    all_batches = tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0)
     return all_batches
 
   def itervaml_helper1(self, post_val):
