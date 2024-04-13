@@ -251,13 +251,13 @@ class ActorCritic(common.Module):
           # critic_loss, mets4 = self.critic_loss(seq, target)
           actor_loss, mets3 = self.actor_loss(seq, target)
     #Printing weights for debugging
-    tf.print('pre-update')
+    # tf.print('pre-update')
     model_weights = [var for var in world_model.rssm.trainable_variables]
-    tf.print(model_weights[0])
+    # tf.print(model_weights[0])
     metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm])) #Remove critic.loss from array to see weight update on just the world_model.rssm.
-    tf.print('post-update')
+    # tf.print('post-update')
     model_weights = [var for var in world_model.rssm.trainable_variables]
-    tf.print(model_weights[0])
+    # tf.print(model_weights[0])
     #Update the actor
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
     
