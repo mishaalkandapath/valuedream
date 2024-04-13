@@ -97,6 +97,11 @@ class Optimizer(tf.Module):
     # Find variables.
     modules = modules if hasattr(modules, '__len__') else (modules,)
     varibs = tf.nest.flatten([module.variables for module in modules])
+
+    # if WM is passed in then truncate
+    if self._name == 'critic':
+      varibs = varibs[:-6]
+
     count = sum(np.prod(x.shape) for x in varibs)
     if self._once:
       print(f'Found {count} {self._name} parameters.')
@@ -150,79 +155,3 @@ class Optimizer(tf.Module):
         if nontrivial:
           print('- ' + self._name + '/' + var.name)
         var.assign((1 - self._wd) * var)
-
-class WMOptimizer(Optimizer):
-  def __init__(
-      self, name, lr, eps=1e-4, clip=None, wd=None,
-      opt='adam', wd_pattern=r'.*', accum_steps=1):
-    super().__init__(name, lr, eps, clip, wd, opt, wd_pattern)
-    self.accum_steps = accum_steps
-    self.accum_grad = None
-    self.steps = 0
-
-  def __call__(self, tape, loss, modules):
-    assert loss.dtype is tf.float32, (self._name, loss.dtype)
-    assert len(loss.shape) == 0, (self._name, loss.shape)
-    metrics = {}
-
-    # Find variables.
-    modules = modules if hasattr(modules, '__len__') else (modules,)
-    varibs = tf.nest.flatten([module.variables for module in modules])
-    
-    # Last 6 don't contribute
-    varibs = varibs[:-6]
-
-    count = sum(np.prod(x.shape) for x in varibs)
-    if self._once:
-      print(f'Found {count} {self._name} parameters.')
-      self._once = False
-
-    # Check loss.
-    tf.debugging.check_numerics(loss, self._name + '_loss')
-    metrics[f'{self._name}_loss'] = loss
-
-    # Compute scaled gradient.
-    if self._mixed:
-      with tape:
-        loss = self._opt.get_scaled_loss(loss)
-    grads = tape.gradient(loss, varibs)
-
-    if self._mixed:
-      grads = self._opt.get_unscaled_gradients(grads)
-    if self._mixed:
-      metrics[f'{self._name}_loss_scale'] = self._opt.loss_scale
-
-    # Distributed sync.
-    context = tf.distribute.get_replica_context()
-    if context:
-      grads = context.all_reduce('mean', grads)
-
-    # Gradient clipping.
-    norm = tf.linalg.global_norm(grads)
-    if not self._mixed:
-      tf.debugging.check_numerics(norm, self._name + '_norm')
-    if self._clip:
-      grads, _ = tf.clip_by_global_norm(grads, self._clip, norm)
-    metrics[f'{self._name}_grad_norm'] = norm
-
-    if self.steps == 0:
-      self.accum_grad = grads
-    else:
-      assert(len(self.accum_grad) == len(grads))
-      new_grad_list = [grads[i] + self.accum_grad[i] for i in range(len(grads))]
-      self.accum_grad = new_grad_list
-    
-    self.steps += 1
-
-    # Apply gradients.
-    if self.steps % self.accum_steps == 0:
-      # Weight decay.
-      if self._wd:
-        self._apply_weight_decay(varibs)
-      self._opt.apply_gradients(
-          zip(self.accum_grad, varibs),
-          experimental_aggregate_gradients=False)
-
-    return metrics
-
-

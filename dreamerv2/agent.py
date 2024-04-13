@@ -225,7 +225,6 @@ class ActorCritic(common.Module):
       self._target_critic = self.critic
     self.actor_opt = common.Optimizer('actor', **self.config.actor_opt)
     self.critic_opt = common.Optimizer('critic', **self.config.critic_opt)
-    self.wm_opt = common.WMOptimizer('wm', **self.config.critic_opt, accum_steps=self.config.accum_steps)
     self.rewnorm = common.StreamNorm(**self.config.reward_norm)
 
   def train(self, world_model, start, is_terminal, reward_fn):
@@ -251,16 +250,14 @@ class ActorCritic(common.Module):
     #Update the actor
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
 
-    # Update the critic
-    metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
-
     #Printing weights for debugging
     # tf.print('pre-update')
     # model_weights = [var for var in world_model.rssm.trainable_variables]
     # tf.print(model_weights[0])
-    
-    metrics.update(self.wm_opt(wm_tape, critic_loss, world_model.rssm)) 
-    
+
+    # Update the critic
+    metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm]))
+        
     # tf.print('post-update')
     # model_weights = [var for var in world_model.rssm.trainable_variables]
     # tf.print(model_weights[0])
