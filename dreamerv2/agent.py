@@ -270,8 +270,8 @@ class ActorCritic(common.Module):
           seq['reward'], mets1 = self.rewnorm(reward)
           mets1 = {f'reward_{k}': v for k, v in mets1.items()}
           target, mets2 = self.target(seq)
-          critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
-          # critic_loss, mets4 = self.critic_loss(seq, target)
+          # critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
+          critic_loss, mets4 = self.critic_loss(seq, target)
           actor_loss, mets3 = self.actor_loss(seq, target)
     #Printing weights for debugging
     # tf.print('pre-update')
