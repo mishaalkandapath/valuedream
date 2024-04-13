@@ -377,16 +377,19 @@ class ActorCritic(common.Module):
     flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
     flat_seq = flatten(seq)
     accum_seq = None
+    p = []
     for i in range(n_batches):
       start = i*hor*obslen
       batch_accum = flat_seq[start:start + hor*(obslen-hor)]
       start += hor*(obslen-hor+1)
       extra_seq = [flat_seq[start+(j*hor):start+(j*hor)+(hor-j)] for j in range(hor)]
       
-      if accum_seq is None: 
-        accum_seq = tf.concat([batch_accum, tf.concat(extra_seq,0)],0)
+      if accum_seq is None: accum_seq = tf.concat([batch_accum, tf.concat(extra_seq,0)],0)
       else: accum_seq = tf.concat([accum_seq, batch_accum, tf.concat(extra_seq,0)],0)
+      p.append(accum_seq)
 
+    print(p)
+    print(len(p))
     # shape = (obslen*n_batches*hor - the unneeded parts, 2048)
     return accum_seq
     # hor = self.config.imag_horizon
