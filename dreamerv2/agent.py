@@ -335,8 +335,8 @@ class ActorCritic(common.Module):
   
   def critic_itervaml(self, seq, code_vecs):
     weight = seq['weight']
-    print("WEIGHTS", weight[:-1])    # (8,50)
-    reshape_weights = self.itervaml_helper(weight[:-1])
+    print("WEIGHTS", weight[:-1])    # (hor,batch*seqlen)
+    reshape_weights = self.reshape_seq(weight[:-1], code_vecs.shape[1], code_vecs.shape[0])
     print("WEIGHTS RESHAPED", reshape_weights) # currently: (260,)
     
     # first reshape seq["feat"][:-1] to be a vector
