@@ -335,19 +335,19 @@ class ActorCritic(common.Module):
   
   def critic_itervaml(self, seq, code_vecs):
     weight = seq['weight']
-    print("WEIGHTS", weight[:-1])    # (hor,batch*seqlen)
+    # print("WEIGHTS", weight[:-1])    # (hor,batch*seqlen)
     reshape_weights = self.reshape_seq(weight[:-1], code_vecs.shape[1], code_vecs.shape[0])
-    print("WEIGHTS RESHAPED", reshape_weights) # currently: (260,)
+    # print("WEIGHTS RESHAPED", reshape_weights) # currently: (260,)
     
     # first reshape seq["feat"][:-1] to be a vector
     restructured_seq = self.reshape_seq(seq["feat"][:-1], code_vecs.shape[1], code_vecs.shape[0])
     # call the critic on it to get distribution
-    print("RESTRUCTURED SEQ", seq["feat"][:-1], restructured_seq)
+    # print("RESTRUCTURED SEQ", seq["feat"][:-1], restructured_seq)
     dist = self.critic(restructured_seq)
     
     # next reshape code_vecs to be a vector, call dist on it, get mean
     restructured_post = self.itervaml_helper(code_vecs)
-    print("RESTRUCTURED POST", code_vecs, restructured_post)
+    # print("RESTRUCTURED POST", code_vecs, restructured_post)
     
     # -log_prob.mean()
     # NOTE: using expected value from post val dist, but is KL better? 
