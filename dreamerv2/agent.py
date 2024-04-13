@@ -363,6 +363,7 @@ class ActorCritic(common.Module):
     # first reshape seq["feat"][:-1] to be a vector
     restructured_seq = self.reshape_seq(seq["feat"][:-1], code_vecs.shape[1], code_vecs.shape[0])
     # call the critic on it to get distribution
+    print("RESTRUCTURED SEQ", restructured_seq)
     dist = self.critic(restructured_seq)
     
     # next reshape code_vecs to be a vector, call dist on it, get mean
@@ -375,13 +376,29 @@ class ActorCritic(common.Module):
     hor = self.config.imag_horizon
     flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
     flat_seq = flatten(seq)
-    extra_mask=[]  # hor*(hor-1)
-    for i in range(1,hor): extra_mask.extend([True]*(hor-i)+[False]*i)
-    batch_mask = tf.constant([True]*hor*(obslen-hor+1)+extra_mask)
-    mask = tf.concat([batch_mask] * n_batches, axis=0)
+    accum_seq = None
     
-    # shape = (obslen*n_batches*hor - the unneeded parts,2048)
-    return tf.boolean_mask(flat_seq, mask, axis=0)
+    for i in range(n_batches):
+      start = i*hor*obslen
+      batch_accum = flat_seq[start:start + hor*(obslen-hor)]
+      start += hor*(obslen-hor+1)
+      extra_seq = [(flat_seq[start+(j*hor):start+(j*hor)+(hor-j)]) for j in range(0,hor)]
+      
+      if not accum_seq: accum_seq = tf.concat([batch_accum, extra_seq],0)
+      else: tf.concat([accum_seq, batch_accum, extra_seq],0)
+        
+    # shape = (obslen*n_batches*hor - the unneeded parts, 2048)
+    return accum_seq
+    # hor = self.config.imag_horizon
+    # flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
+    # flat_seq = flatten(seq)
+    # extra_mask=[]  # hor*(hor-1)
+    # for i in range(1,hor): extra_mask.extend([True]*(hor-i)+[False]*i)
+    # batch_mask = tf.constant([True]*hor*(obslen-hor+1)+extra_mask)
+    # mask = tf.concat([batch_mask] * n_batches, axis=0)
+    
+    # # shape = (obslen*n_batches*hor - the unneeded parts,2048)
+    # return tf.boolean_mask(flat_seq, mask, axis=0)
   
   def critic_itervaml_attempt1(self, seq, code_vecs):
     # States:     [z0]  [z1]  [z2]   z3
