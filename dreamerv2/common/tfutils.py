@@ -117,11 +117,6 @@ class Optimizer(tf.Module):
     if self._mixed:
       metrics[f'{self._name}_loss_scale'] = self._opt.loss_scale
 
-    #print(self._name)
-    #print(grads)
-    #print(f'Length of grads is: {len(grads)}')
-    grads = [x if x is not None else 0.0 for x in grads]
-    #print(grads)
     # Distributed sync.
     context = tf.distribute.get_replica_context()
     if context:
