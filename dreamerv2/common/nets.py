@@ -292,8 +292,9 @@ class Decoder(common.Module):
 
   def __init__(
       self, shapes, cnn_keys=r'.*', mlp_keys=r'.*', act='elu', norm='none',
-      cnn_depth=48, cnn_kernels=(4, 4, 4, 4), mlp_layers=[400, 400, 400, 400]):
+      cnn_depth=48, cnn_kernels=(4, 4, 4, 4), mlp_layers=[400, 400, 400, 400], custom=False):
     self._shapes = shapes
+    # print("shapes in decoder: {}".format(shapes))
     self.cnn_keys = [
         k for k, v in shapes.items() if re.match(cnn_keys, k) and len(v) == 3]
     self.mlp_keys = [
@@ -305,6 +306,7 @@ class Decoder(common.Module):
     self._cnn_depth = cnn_depth
     self._cnn_kernels = cnn_kernels
     self._mlp_layers = mlp_layers
+    self._custom = custom
 
   def __call__(self, features):
     features = tf.cast(features, prec.global_policy().compute_dtype)
@@ -316,6 +318,7 @@ class Decoder(common.Module):
     return outputs
 
   def _cnn(self, features):
+    # print("in decoder we have features of shape {}".format(features.shape))
     channels = {k: self._shapes[k][-1] for k in self.cnn_keys}
     ConvT = tfkl.Conv2DTranspose
     x = self.get('convin', tfkl.Dense, 32 * self._cnn_depth)(features)
@@ -330,6 +333,9 @@ class Decoder(common.Module):
       x = act(x)
     x = x.reshape(features.shape[:-1] + x.shape[1:])
     means = tf.split(x, list(channels.values()), -1)
+    # print("decoder output shape is {}".format(x.shape))
+    if self._custom:
+      return means[0]
     dists = {
         key: tfd.Independent(tfd.Normal(mean, 1), 3)
         for (key, shape), mean in zip(channels.items(), means)}
@@ -367,8 +373,8 @@ class MLP(common.Module):
       x = self._act(x)
     x = x.reshape(features.shape[:-1] + [x.shape[-1]])
     return self.get('out', DistLayer, self._shape, **self._out)(x)
-
-
+  
+  
 class GRUCell(tf.keras.layers.AbstractRNNCell):
 
   def __init__(self, size, norm=False, act='tanh', update_bias=-1, **kwargs):
