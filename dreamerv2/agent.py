@@ -377,7 +377,6 @@ class ActorCritic(common.Module):
     flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
     flat_seq = flatten(seq)
     accum_seq = None
-    p = []
     for i in range(n_batches):
       start = i*hor*obslen
       batch_accum = flat_seq[start:start + hor*(obslen-hor)]
@@ -386,22 +385,8 @@ class ActorCritic(common.Module):
       
       if accum_seq is None: accum_seq = tf.concat([batch_accum, tf.concat(extra_seq,0)],0)
       else: accum_seq = tf.concat([accum_seq, batch_accum, tf.concat(extra_seq,0)],0)
-      p.append(extra_seq)
-
-    print(p)
-    print(len(p))
     # shape = (obslen*n_batches*hor - the unneeded parts, 2048)
     return accum_seq
-    # hor = self.config.imag_horizon
-    # flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
-    # flat_seq = flatten(seq)
-    # extra_mask=[]  # hor*(hor-1)
-    # for i in range(1,hor): extra_mask.extend([True]*(hor-i)+[False]*i)
-    # batch_mask = tf.constant([True]*hor*(obslen-hor+1)+extra_mask)
-    # mask = tf.concat([batch_mask] * n_batches, axis=0)
-    
-    # # shape = (obslen*n_batches*hor - the unneeded parts,2048)
-    # return tf.boolean_mask(flat_seq, mask, axis=0)
   
   def critic_itervaml_attempt1(self, seq, code_vecs):
     # States:     [z0]  [z1]  [z2]   z3
@@ -437,13 +422,14 @@ class ActorCritic(common.Module):
 
   def itervaml_helper(self, post_val):
     # NOTE: this code won't work well if config.imag_horizon >> seqlen
-    # post_val shape = (batch, seqlen) == (16,50)
-    # output: (horizon, batch*seqlen) == (15,800)
+    # post_val shape = (batch, seqlen) == (16,50,2048)
+    # output: (horizon, batch*seqlen) == (obslen*n_batches*hor - extra,2048)
     hor = self.config.imag_horizon
     seqlen = post_val.shape[1]
+    y = post_val[0]
     reshape_batch = lambda x: tf.concat([x[i:i+hor] if i <= (seqlen - hor) 
                                         else x[i:] for i in range(seqlen)],0) # row/batch = (50,) -> (50*15 - extra)
-    print("RESHAPED BATCH", reshape_batch)
+    print("RESHAPED BATCH", reshape_batch(y))
     all_batches = tf.transpose(tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0), [1,0])
     return all_batches
 
