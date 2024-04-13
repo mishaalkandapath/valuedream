@@ -182,12 +182,12 @@ class WMOptimizer(Optimizer):
       with tape:
         loss = self._opt.get_scaled_loss(loss)
     grads = tape.gradient(loss, varibs)
-    
+     
     # Remove NoneType gradients
     pairs = zip(varibs, grads)  # get rid of the NoneTypes
     pairs = [(v, g) for v, g in pairs if g is not None]
     varibs = [p[0] for p in pairs]  # update with new variables
-    grads = [p[1] for p in pairs]   # update with new grads
+    grads = tf.convert_to_tensor([p[1] for p in pairs])   # update with new grads
 
     if self._mixed:
       grads = self._opt.get_unscaled_gradients(grads)
@@ -197,7 +197,7 @@ class WMOptimizer(Optimizer):
     #print(self._name)
     #print(grads)
     #print(f'Length of grads is: {len(grads)}')
-    grads = [x if x is not None else 0.0 for x in grads]
+    grads = tf.convert_to_tensor([x if x is not None else 0.0 for x in grads])
     #print(grads)
     # Distributed sync.
     context = tf.distribute.get_replica_context()
@@ -216,7 +216,7 @@ class WMOptimizer(Optimizer):
       self.accum_grad = grads
     else:
       assert(len(self.accum_grad) == len(grads))
-      new_grad_list = [grads[i] + self.accum_grad[i] for i in range(len(grads))]
+      new_grad_list = tf.convert_to_tensor([grads[i] + self.accum_grad[i] for i in range(len(grads))])
       self.accum_grad = new_grad_list
     
     self.steps += 1
