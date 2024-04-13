@@ -168,6 +168,10 @@ class WMOptimizer(Optimizer):
     # Find variables.
     modules = modules if hasattr(modules, '__len__') else (modules,)
     varibs = tf.nest.flatten([module.variables for module in modules])
+    
+    # Last 6 don't contribute
+    varibs = varibs[:-6]
+
     count = sum(np.prod(x.shape) for x in varibs)
     if self._once:
       print(f'Found {count} {self._name} parameters.')
@@ -182,12 +186,6 @@ class WMOptimizer(Optimizer):
       with tape:
         loss = self._opt.get_scaled_loss(loss)
     grads = tape.gradient(loss, varibs)
-     
-    # Remove NoneType gradients
-    pairs = zip(varibs, grads)  # get rid of the NoneTypes
-    pairs = [(v, g) for v, g in pairs if g is not None]
-    varibs = [p[0] for p in pairs]  # update with new variables
-    grads = tf.convert_to_tensor([p[1] for p in pairs])   # update with new grads
 
     if self._mixed:
       grads = self._opt.get_unscaled_gradients(grads)
@@ -211,7 +209,7 @@ class WMOptimizer(Optimizer):
       self.accum_grad = grads
     else:
       assert(len(self.accum_grad) == len(grads))
-      new_grad_list = tf.convert_to_tensor([grads[i] + self.accum_grad[i] for i in range(len(grads))])
+      new_grad_list = [grads[i] + self.accum_grad[i] for i in range(len(grads))]
       self.accum_grad = new_grad_list
     
     self.steps += 1

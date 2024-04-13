@@ -259,7 +259,7 @@ class ActorCritic(common.Module):
     # model_weights = [var for var in world_model.rssm.trainable_variables]
     # tf.print(model_weights[0])
     
-    # metrics.update(self.wm_opt(wm_tape, critic_loss, world_model.rssm)) 
+    metrics.update(self.wm_opt(wm_tape, critic_loss, world_model.rssm)) 
     
     # tf.print('post-update')
     # model_weights = [var for var in world_model.rssm.trainable_variables]
