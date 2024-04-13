@@ -294,8 +294,8 @@ class ActorCritic(common.Module):
       # TARGET:: Tensor("stack_5:0", shape=(15, 400), dtype=float32)
       actor_loss, mets3 = self.actor_loss(seq, target) # train the actor here based on teh value predictions from the target
     with tf.GradientTape() as critic_tape:
-      critic_loss, mets4 = self.critic_loss(seq, target) # train the critic
-      # critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
+      # critic_loss, mets4 = self.critic_loss(seq, target) # train the critic
+      critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
     metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
     metrics.update(**mets1, **mets2, **mets3, **mets4)
