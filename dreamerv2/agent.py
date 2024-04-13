@@ -395,6 +395,16 @@ class ActorCritic(common.Module):
       else: accum_seq = tf.concat([accum_seq, batch_accum, tf.concat(extra_seq,0)],0)
     # shape = (obslen*n_batches*hor - the unneeded parts, 2048)
     return accum_seq
+  # hor = self.config.imag_horizon
+    # flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
+    # flat_seq = flatten(seq)
+    # extra_mask=[]  # hor*(hor-1)
+    # for i in range(1,hor): extra_mask.extend([True]*(hor-i)+[False]*i)
+    # batch_mask = tf.constant([True]*hor*(obslen-hor+1)+extra_mask)
+    # mask = tf.concat([batch_mask] * n_batches, axis=0)
+    
+    # # shape = (obslen*n_batches*hor - the unneeded parts,2048)
+    # return tf.boolean_mask(flat_seq, mask, axis=0)
   
   def critic_itervaml_attempt1(self, seq, code_vecs):
     # States:     [z0]  [z1]  [z2]   z3
