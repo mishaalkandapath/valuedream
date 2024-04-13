@@ -380,8 +380,9 @@ class ActorCritic(common.Module):
     for i in range(1,hor): extra_mask.extend([True]*(hor-i)+[False]*i)
     batch_mask = tf.constant([True]*hor*(obslen-hor+1)+extra_mask)
     mask = tf.concat([batch_mask] * n_batches, axis=0)
-    print("FLATTENED MASK", mask)
-    print("FLATTENED SEQ", flat_seq)
+    # print("FLATTENED MASK", mask)
+    # print("FLATTENED SEQ", flat_seq)
+    print("REMOVED", tf.boolean_mask(flat_seq, mask))
         
     # first: remove unneeded
     
