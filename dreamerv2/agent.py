@@ -114,6 +114,10 @@ class WorldModel(common.Module):
     metrics.update(self.model_opt(model_tape, model_loss, modules))
     # print("DONE UPDATE")
     return state, outputs, metrics
+  
+  # @tf.function
+  # def slice_tensor(self, i, tensor):
+  #     return tensor[i:, :]
 
   def multi_step_helper(self, data):
     #convert the matrix into what we want:
@@ -121,6 +125,15 @@ class WorldModel(common.Module):
     images = data["image"]
     images = swap(images)
     new_images = tf.concat([images[i:, :] for i in range(0, 5)], 0)
+
+    # # Create a tensor of indices
+    # indices = tf.range(5)
+
+    # # Parallelize slicing using tf.vectorized_map
+    # sliced_images = tf.vectorized_map(lambda i: self.slice_tensor(i, images), indices)
+
+    # # Concatenate the sliced tensors
+    # new_images = tf.concat(sliced_images, axis=0)
     return swap(new_images)    
 
   def loss(self, data, state=None):
