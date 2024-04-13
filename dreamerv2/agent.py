@@ -382,7 +382,7 @@ class ActorCritic(common.Module):
       start = i*hor*obslen
       batch_accum = flat_seq[start:start + hor*(obslen-hor)]
       start += hor*(obslen-hor+1)
-      extra_seq = [(flat_seq[start+(j*hor):start+(j*hor)+(hor-j)]) for j in range(0,hor)]
+      extra_seq = [flat_seq[start+(j*hor):start+(j*hor)+(hor-j)] for j in range(0,hor)]
       
       if not accum_seq: accum_seq = tf.concat([batch_accum, extra_seq],0)
       else: tf.concat([accum_seq, batch_accum, extra_seq],0)
