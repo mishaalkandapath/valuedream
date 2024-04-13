@@ -123,12 +123,12 @@ class WorldModel(common.Module):
     # with tf.Session() as sess: print("the first few actions are {}".format(data["action"][0, 0:3].eval())) 
     data = self.preprocess(data)
     embed = self.encoder(data)
-    # print("PROCESSED WITH ENCODER")
+    print("PROCESSED WITH ENCODER")
     # print("state is none? {}".format(state is None))
     # print("but we have data of shape {}".format(data["image"].shape))  
     post, prior = self.rssm.observe(
         embed, data['action'], data['is_first'], state)
-    # print("DONE OBSERVING")
+    print("DONE OBSERVING")
     kl_loss, kl_value = self.rssm.kl_loss(post, prior, **self.config.kl) # kl loss between post and prior
     assert len(kl_loss.shape) == 0
     likes = {}
@@ -140,7 +140,7 @@ class WorldModel(common.Module):
       grad_head = (name in self.config.grad_heads)
       inp = feat if grad_head else tf.stop_gradient(feat)
       out = head(inp, data["action"]) if name == "decoder" and self._changed else head(inp)
-      # print("DONE HEAD {}".format(name))
+      print("DONE HEAD {}".format(name))
       dists = out if isinstance(out, dict) else {name: out}
       # print("for head {} we have {} ".format(name, list(dists.keys())))
       for key, dist in dists.items(): #loss on the log probability of the true vakue being observed under the predicted distribution for all the heads
@@ -149,7 +149,7 @@ class WorldModel(common.Module):
         else: like = tf.cast(dist.log_prob(data[key]), tf.float32)
         likes[key] = like
         losses[key] = -like.mean()
-      # print("DONE LOSS {}".format(name))
+      print("DONE LOSS {}".format(name))
     model_loss = sum(
         self.config.loss_scales.get(k, 1.0) * v for k, v in losses.items())
     outs = dict(
@@ -220,10 +220,10 @@ class WorldModel(common.Module):
     embed = self.encoder(data)
     states, _ = self.rssm.observe(
         embed[:6, :5], data['action'][:6, :5], data['is_first'][:6, :5])
-    recon = decoder(self.rssm.get_feat(states))[key].mode()[:6]
+    recon = decoder(self.rssm.get_feat(states), data['action'][:6, :5], hor=1)[key].mode()[:6]
     init = {k: v[:, -1] for k, v in states.items()}
     prior = self.rssm.imagine(data['action'][:6, 5:], init)
-    openl = decoder(self.rssm.get_feat(prior))[key].mode()
+    openl = decoder(self.rssm.get_feat(prior), data['action'][:6, 5:], hor=1)[key].mode()
     model = tf.concat([recon[:, :5] + 0.5, openl + 0.5], 1)
     error = (model - truth + 1) / 2
     video = tf.concat([truth, model, error], 2)

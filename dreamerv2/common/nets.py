@@ -7,6 +7,7 @@ from tensorflow_probability import distributions as tfd
 import tensorflow.keras.mixed_precision as prec
 
 import common
+from collections import defaultdict
 
 
 class EnsembleRSSM(common.Module):
@@ -231,6 +232,7 @@ class Encoder(common.Module):
       x = self.get(f'densenorm{i}', NormLayer, self._norm)(x)
       x = self._act(x)
     return x
+
 
 class RecurrentDecoder(common.Module):
   def __init__(self, shapes, cnn_keys=r'.*', mlp_keys=r'.*', act='elu', norm='none', cnn_depth=48, cnn_kernels=(4, 4, 4, 4), mlp_layers=[400, 400, 400, 400]):
