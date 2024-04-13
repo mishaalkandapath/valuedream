@@ -113,7 +113,6 @@ class Replay:
     sequence['is_first'] = np.zeros(len(sequence['action']), bool)
     sequence['is_first'][0] = True
     if self._maxlen:
-      print(len(sequence["action"]))
       assert self._minlen <= len(sequence['action']) <= self._maxlen
     return sequence
 
