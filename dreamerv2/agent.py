@@ -386,7 +386,7 @@ class ActorCritic(common.Module):
       
       if accum_seq is None: accum_seq = tf.concat([batch_accum, tf.concat(extra_seq,0)],0)
       else: accum_seq = tf.concat([accum_seq, batch_accum, tf.concat(extra_seq,0)],0)
-      p.append(accum_seq)
+      p.append(extra_seq)
 
     print(p)
     print(len(p))
