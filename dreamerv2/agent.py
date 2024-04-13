@@ -286,13 +286,11 @@ class ActorCritic(common.Module):
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
     with tf.GradientTape() as actor_tape:
-      print("START SHAPE::",start)
       seq = world_model.imagine(self.actor, start, is_terminal, hor) # generate an imagined trajectory upto horizon H 
       reward = reward_fn(seq)
       seq['reward'], mets1 = self.rewnorm(reward)
       mets1 = {f'reward_{k}': v for k, v in mets1.items()}
       target, mets2 = self.target(seq)
-      print("TARGET::", target)
       # TARGET:: Tensor("stack_5:0", shape=(15, 400), dtype=float32)
       actor_loss, mets3 = self.actor_loss(seq, target) # train the actor here based on teh value predictions from the target
     with tf.GradientTape() as critic_tape:
@@ -363,19 +361,19 @@ class ActorCritic(common.Module):
     # first reshape seq["feat"][:-1] to be a vector
     restructured_seq = self.reshape_seq(seq["feat"][:-1], code_vecs.shape[1], code_vecs.shape[0])
     # call the critic on it to get distribution
-    print("RESTRUCTURED SEQ", restructured_seq)
+    # print("RESTRUCTURED SEQ", restructured_seq)
     dist = self.critic(restructured_seq)
     
     # next reshape code_vecs to be a vector, call dist on it, get mean
     restructured_post = self.itervaml_helper(code_vecs)
-    print("RESTRUCTURED POST", restructured_post)
+    # print("RESTRUCTURED POST", restructured_post)
     
     # -log_prob.mean()
     # NOTE: using expected value from post val dist, but is KL better? 
     estimated_code_value = self.critic(restructured_post).mean() 
     neg_loglike = -(dist.log_prob(estimated_code_value))
     
-    print("NEGLOGLIKE::", neg_loglike)
+    # print("NEGLOGLIKE::", neg_loglike)
     critic_loss = neg_loglike.mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
