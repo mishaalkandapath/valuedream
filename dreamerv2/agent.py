@@ -69,7 +69,7 @@ class Agent(common.Module):
       mets = self._expl_behavior.train(start, outputs, data)[-1]
       metrics.update({'expl_' + key: value for key, value in mets.items()})
     w2 = self._task_behavior.critic.variables
-    tf.print(all([tf.reduce_all(tf.equal(w1[i], w2[i])) for i in range(len(w1))]))
+    # tf.print(all([tf.reduce_all(tf.equal(w1[i], w2[i])) for i in range(len(w1))]))
     return state, metrics
 
   @tf.function
@@ -335,19 +335,19 @@ class ActorCritic(common.Module):
   
   def critic_itervaml(self, seq, code_vecs):
     weight = seq['weight']
-    print("WEIGHTS", weight[:-1])    # 
-    reshape_weights = self.reshape_seq(weight[:-1], code_vecs.shape[1], code_vecs.shape[0])
-    print("WEIGHTS RESHAPED", reshape_weights)
+    print("WEIGHTS", weight[:-1])    # (8,50)
+    reshape_weights = self.itervaml_helper(weight[:-1], code_vecs.shape[1], code_vecs.shape[0])
+    print("WEIGHTS RESHAPED", reshape_weights) # currently: (260,)
     
     # first reshape seq["feat"][:-1] to be a vector
     restructured_seq = self.reshape_seq(seq["feat"][:-1], code_vecs.shape[1], code_vecs.shape[0])
     # call the critic on it to get distribution
-    # print("RESTRUCTURED SEQ", restructured_seq)
+    print("RESTRUCTURED SEQ", restructured_seq)
     dist = self.critic(restructured_seq)
     
     # next reshape code_vecs to be a vector, call dist on it, get mean
     restructured_post = self.itervaml_helper(code_vecs)
-    # print("RESTRUCTURED POST", restructured_post)
+    print("RESTRUCTURED POST", restructured_post)
     
     # -log_prob.mean()
     # NOTE: using expected value from post val dist, but is KL better? 
