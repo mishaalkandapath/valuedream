@@ -62,14 +62,11 @@ class Agent(common.Module):
     metrics.update(mets)
     start = outputs['post']
     reward = lambda seq: self.wm.heads['reward'](seq['feat']).mode()
-    w1 = self._task_behavior.critic.variables
     metrics.update(self._task_behavior.train(
         self.wm, start, data['is_terminal'], reward))
     if self.config.expl_behavior != 'greedy':
       mets = self._expl_behavior.train(start, outputs, data)[-1]
       metrics.update({'expl_' + key: value for key, value in mets.items()})
-    w2 = self._task_behavior.critic.variables
-    tf.print(all([tf.reduce_all(tf.equal(w1[i], w2[i])) for i in range(len(w1))]))
     return state, metrics
 
   @tf.function
