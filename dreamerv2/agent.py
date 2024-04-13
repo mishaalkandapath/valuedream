@@ -382,7 +382,7 @@ class ActorCritic(common.Module):
     mask = tf.concat([batch_mask] * n_batches, axis=0)
     # print("FLATTENED MASK", mask)
     # print("FLATTENED SEQ", flat_seq)
-    print("REMOVED", tf.boolean_mask(flat_seq, tf.expand_dims(mask, axis=-1)))
+    print("REMOVED", tf.boolean_mask(flat_seq, mask, axis=0))
         
     # first: remove unneeded
     
