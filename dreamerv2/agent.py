@@ -362,17 +362,16 @@ class ActorCritic(common.Module):
   def critic_itervaml(self, seq, code_vecs):
     # first reshape seq["feat"][:-1] to be a vector
     restructured_seq = self.reshape_seq(seq["feat"][:-1], code_vecs.shape[1], code_vecs.shape[0])
-    
     # call the critic on it to get distribution
+    dist = self.critic(restructured_seq)
     
     # next reshape code_vecs to be a vector, call dist on it, get mean
-    
+    self.itervaml_helper(code_vecs)
     
     # -log_prob.mean()
     pass
 
   def reshape_seq(self, seq, obslen, n_batches):
-    print(seq, obslen, n_batches)
     hor = self.config.imag_horizon
     flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
     flat_seq = flatten(seq)
@@ -380,18 +379,9 @@ class ActorCritic(common.Module):
     for i in range(1,hor): extra_mask.extend([True]*(hor-i)+[False]*i)
     batch_mask = tf.constant([True]*hor*(obslen-hor+1)+extra_mask)
     mask = tf.concat([batch_mask] * n_batches, axis=0)
-    # print("FLATTENED MASK", mask)
-    # print("FLATTENED SEQ", flat_seq)
-    print("REMOVED", tf.boolean_mask(flat_seq, mask, axis=0))
-        
-    # first: remove unneeded
     
-    # row = seq[:][0][:]
-    # print("ROWWWW", row)
-    
-    # reshape_batch = lambda x: tf.concat([x[i:i+hor] if i <= (obslen - hor) else x[i:] for i in range(obslen)]) # row/batch = (50,) -> (50,15)
-    # all_batches = tf.concat([reshape_batch(seq[i*obslen:(i+1)*obslen]) for i in range(n_batches)], 0)
-    # return all_batches
+    # shape = (obslen*n_batches*hor - the unneeded parts,2048)
+    return tf.boolean_mask(flat_seq, mask, axis=0)
   
   def critic_itervaml_attempt1(self, seq, code_vecs):
     # States:     [z0]  [z1]  [z2]   z3
@@ -426,6 +416,18 @@ class ActorCritic(common.Module):
     return critic_loss, metrics
 
   def itervaml_helper(self, post_val):
+    # NOTE: this code won't work well if config.imag_horizon >> seqlen
+    # post_val shape = (batch, seqlen) == (16,50)
+    # output: (horizon, batch*seqlen) == (15,800)
+    hor = self.config.imag_horizon
+    seqlen = post_val.shape[1]
+    reshape_batch = lambda x: tf.concat([x[i:i+hor] if i <= (seqlen - hor) 
+                                        else x[i:] for i in range(seqlen)],0) # row/batch = (50,) -> (50*15 - extra)
+    print("RESHAPED BATCH", reshape_batch)
+    all_batches = tf.transpose(tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0), [1,0])
+    return all_batches
+
+  def itervaml_helper1(self, post_val):
     # NOTE: this code won't work well if config.imag_horizon >> seqlen
     # post_val shape = (batch, seqlen) == (16,50)
     # output: (horizon, batch*seqlen) == (15,800)
