@@ -440,7 +440,7 @@ class ShallowDecoder(Decoder):
      # basically 10 boxes of size 4 x 4x 3.
     x_ = get_act("sigmoid")(x_) * 64*64*3 # convert to indices
     # #cast x_ to an integer type
-    indices = tf.range(64*64*3, dtype=tf.int32)
+    indices = tf.range(64*64*3, dtype=prec.global_policy().compute_dtype)
     indices = indices.reshape((1, 1, 64*64*3)) # make new index
     x_ = tf.expand_dims(x_, axis=-1) # add a new dimension
 
