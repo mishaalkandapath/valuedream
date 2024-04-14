@@ -141,7 +141,7 @@ class ShallowWorldModel(common.Module):
     images = data["image"]
     reshaped_indices = indices.reshape(indices.shape[:2] +  (10*4*4*3, 1))
 
-    grid = tf.range(64*64*3)[None, None, None, 1]
+    grid = tf.range(64*64*3, dtype=tf.float32)[None, None, None, 1]
     distances = tf.square(reshaped_indices - grid)
     probs = tf.nn.softmax(-distances, axis=-1)
 
