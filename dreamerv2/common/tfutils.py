@@ -129,6 +129,10 @@ class Optimizer(tf.Module):
 
     # Distributed sync.
     context = tf.distribute.get_replica_context()
+
+    #only consider grads that are not None
+    # grads = [g if g is not None else 0.0 for g in grads]
+
     if context:
       grads = context.all_reduce('mean', grads) # mean across all devices
 

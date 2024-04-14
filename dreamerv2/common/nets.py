@@ -344,6 +344,7 @@ class RecurrenShallowDecoder(common.Module):
     
     outputs = tf.concat([tf.stack(levels[l], 0) for l in levels], axis=0)
     indices = tf.concat([tf.stack(indices_map[l], 0) for l in indices_map], axis=0)
+
     # print("recurrent dcoder shape is ", outputs.shape)
     return {"image": 
             tfd.Independent(tfd.Normal(swap(outputs), 1), 3) }, swap(indices) # of shape 16, 240, 64, 64, 3
@@ -419,27 +420,32 @@ class ShallowDecoder(Decoder):
     # print("in decoder we have features of shape {}".format(features.shape))
     channels = {k: self._shapes[k][-1] for k in self.cnn_keys}
     x = self.get('convdecoderin', tfkl.Dense, 16 * self._cnn_depth)(features)
-    x_ = x
+    # x_ = self.get("attention_indices", tfkl.Dense, 480)(x)
 
     x = self.get("sampledown1", tfkl.Dense, 600)(x)
     x = self._act(x)
     x = self.get("sampledown2", tfkl.Dense, 480)(x)
-    x = get_act("softmax")(x) * 255 # these are colours
+    x = get_act("sigmoid")(x) * 255 # these are colours
 
     x = x.reshape(features.shape[:-1] + (4, 4, 30))
-    means = tf.split(x, [30], -1)
+    means = tf.split(x, [3] * 10, -1)
+    means = tf.stack(means, axis=1)
     # print("decoder output shape is {}".format(x.shape))
     # dists = {
     #     key: tfd.Independent(tfd.Normal(mean, 1), 3)
     #     for (key, shape), mean in zip(channels.items(), means)}
-    dists = means[0]
+    dists = means
     
     #attention indices:
-    x_ = self.get("attention_indices", tfkl.Dense, 480)(x_) # basically 10 boxes of size 4 x 4x 3.
-    x_ = get_act("softmax")(x) * 64*64*3 # convert to indices
-    #cast x_ to an integer type
-    x_ = tf.cast(x_, tf.int32)
-      
+     # basically 10 boxes of size 4 x 4x 3.
+    # x_ = get_act("sigmoid")(x_) * 64*64*3 # convert to indices
+    # #cast x_ to an integer type
+    # x_ = tf.cast(x_, tf.int32)
+    # x_ = x_.reshape(features.shape[:-1] + (4, 4, 30))
+    # x_ = tf.split(x_, [3] * 10, -1)
+    # x_ = tf.stack(x_, axis=1)
+
+    x_ = tf.zeros_like(means, dtype=tf.int32)
     return dists, x_
 
 
