@@ -123,20 +123,33 @@ class ShallowWorldModel(common.Module):
   def multi_step_helper(self, data, indices):
     #convert the matrix into what we want:
     swap = lambda x: tf.transpose(x, [1, 0] + list(range(2, len(x.shape))))
+    # indices_shape = indices.shape
+    # images = data["image"]
+    # images = images.reshape(images.shape[:2] +  (64*64*3,))
+    # images = swap(images)
+    # indices = indices.reshape(indices.shape[:2] +  (4*4*30,))
+
+    # indices = tf.stack([tf.repeat(tf.range(372, dtype=tf.float32), 8 * 480),
+    #                 tf.tile(tf.repeat(tf.range(8, dtype=tf.float32), 480), [372]),
+    #                 tf.reshape(indices, [-1])], axis=1)
+    
+    # new_images = tf.concat([images[i:, :] for i in range(0, 8)], 0)
+    # new_images = swap(new_images)
+    # new_images = tf.gather_nd(params=new_images, indices=indices)
+    # return new_images.reshape(indices_shape)
     indices_shape = indices.shape
     images = data["image"]
-    images = images.reshape(images.shape[:2] +  (64*64*3,))
-    images = swap(images)
-    indices = indices.reshape(indices.shape[:2] +  (4*4*30,))
+    reshaped_indices = indices.reshape(indices.shape[:2] +  (10*4*4*3, 1))
 
-    indices = tf.stack([tf.repeat(tf.range(372, dtype=tf.float32), 8 * 480),
-                    tf.tile(tf.repeat(tf.range(8, dtype=tf.float32), 480), [372]),
-                    tf.reshape(indices, [-1])], axis=1)
-    
-    new_images = tf.concat([images[i:, :] for i in range(0, 8)], 0)
-    new_images = swap(new_images)
-    new_images = tf.gather_nd(params=new_images, indices=indices)
+    grid = tf.range(64*64*3)[None, None, None, 1]
+    distances = tf.square(reshaped_indices - grid)
+    probs = tf.nn.softmax(-distances, axis=-1)
+
+    #weighted sum of the image
+    images = images.reshape(images.shape[:2] +  (64*64*3,))[:, :, None, :]
+    new_images = tf.reduce_sum(images * probs, axis=-1)
     return new_images.reshape(indices_shape)
+
 
   def loss(self, data, state=None):
     # print("At Loss, data shape: {} {}".format(data["image"].shape, data["action"].shape))

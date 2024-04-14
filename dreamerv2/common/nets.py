@@ -439,15 +439,6 @@ class ShallowDecoder(Decoder):
     #attention indices:
      # basically 10 boxes of size 4 x 4x 3.
     x_ = get_act("sigmoid")(x_) * 64*64*3 # convert to indices
-    # #cast x_ to an integer type
-    indices = tf.range(64*64*3, dtype=prec.global_policy().compute_dtype)
-    indices = indices.reshape((1, 1, 64*64*3)) # make new index
-    x_ = tf.expand_dims(x_, axis=-1) # add a new dimension
-
-    #broadcast
-    x_ =  x_ - indices
-    x_ = get_act("relu")(x_) + get_act("relu")(-x_) # differnetibale abs
-    x_ = common.softargmax(x_) # get the max index 
 
     x_ = x_.reshape(features.shape[:-1] + (4, 4, 30))
     x_ = tf.split(x_, [3] * 10, -1)
