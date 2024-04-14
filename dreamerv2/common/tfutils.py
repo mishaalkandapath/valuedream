@@ -38,6 +38,11 @@ for base in (tf.Tensor, tf.Variable, values.PerReplica):
 # tf.TensorHandle.__str__ = lambda x: '<tensor>'
 # np.set_printoptions(threshold=5, edgeitems=0)
 
+def softargmax(x, beta=1e10):
+  # x = tf.convert_to_tensor(x)
+  x_range = tf.range(x.shape.as_list()[-1], dtype=x.dtype)
+  return tf.reduce_sum(tf.nn.softmax(x*beta) * x_range, axis=-1)
+
 
 class Module(tf.Module): #the base class for all modules in tensorflow (Dense, Conv2D, etc.)
 
