@@ -447,7 +447,7 @@ class ShallowDecoder(Decoder):
     #broadcast
     x_ =  x_ - indices
     x_ = get_act("relu")(x_) + get_act("relu")(-x_) # differnetibale abs
-    x_ = common.softargmax(x_, axis=-1) # get the max index 
+    x_ = common.softargmax(x_) # get the max index 
 
     x_ = x_.reshape(features.shape[:-1] + (4, 4, 30))
     x_ = tf.split(x_, [3] * 10, -1)
