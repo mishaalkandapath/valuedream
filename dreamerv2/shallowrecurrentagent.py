@@ -129,8 +129,8 @@ class ShallowWorldModel(common.Module):
     images = swap(images)
     indices = indices.reshape(indices.shape[:2] +  (4*4*30,))
 
-    indices = tf.stack([tf.repeat(tf.range(372), 8 * 480),
-                    tf.tile(tf.repeat(tf.range(8), 480), [372]),
+    indices = tf.stack([tf.repeat(tf.range(372, dtype=tf.float32), 8 * 480),
+                    tf.tile(tf.repeat(tf.range(8, dtype=tf.float32), 480), [372]),
                     tf.reshape(indices, [-1])], axis=1)
     
     new_images = tf.concat([images[i:, :] for i in range(0, 8)], 0)
