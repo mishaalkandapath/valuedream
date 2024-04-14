@@ -146,6 +146,9 @@ class ShallowWorldModel(common.Module):
     probs = tf.nn.softmax(-distances, axis=-1)
 
     #weighted sum of the image
+    images = swap(images)
+    images = tf.concat([images[i:, :] for i in range(0, 8)], 0)
+    images = swap(images)
     images = images.reshape(images.shape[:2] +  (64*64*3,))[:, :, None, :]
     new_images = tf.reduce_sum(images * probs, axis=-1)
     return new_images.reshape(indices_shape)
