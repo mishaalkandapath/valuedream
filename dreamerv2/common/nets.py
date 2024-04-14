@@ -420,7 +420,7 @@ class ShallowDecoder(Decoder):
     # print("in decoder we have features of shape {}".format(features.shape))
     channels = {k: self._shapes[k][-1] for k in self.cnn_keys}
     x = self.get('convdecoderin', tfkl.Dense, 16 * self._cnn_depth)(features)
-    # x_ = self.get("attention_indices", tfkl.Dense, 480)(x)
+    x_ = self.get("attention_indices", tfkl.Dense, 480)(x)
 
     x = self.get("sampledown1", tfkl.Dense, 600)(x)
     x = self._act(x)
@@ -438,12 +438,20 @@ class ShallowDecoder(Decoder):
     
     #attention indices:
      # basically 10 boxes of size 4 x 4x 3.
-    # x_ = get_act("sigmoid")(x_) * 64*64*3 # convert to indices
+    x_ = get_act("sigmoid")(x_) * 64*64*3 # convert to indices
     # #cast x_ to an integer type
-    # x_ = tf.cast(x_, tf.int32)
-    # x_ = x_.reshape(features.shape[:-1] + (4, 4, 30))
-    # x_ = tf.split(x_, [3] * 10, -1)
-    # x_ = tf.stack(x_, axis=1)
+    indices = tf.range(64*64*3, dtype=tf.int32)
+    indices = indices.reshape((1, 1, 64*64*3)) # make new index
+    x_ = tf.expand_dims(x_, axis=-1) # add a new dimension
+
+    #broadcast
+    x_ =  x_ - indices
+    x_ = get_act("relu")(x_) + get_act("relu")(-x_) # differnetibale abs
+    x_ = tf.argmax(x_, axis=-1) # get the max index 
+
+    x_ = x_.reshape(features.shape[:-1] + (4, 4, 30))
+    x_ = tf.split(x_, [3] * 10, -1)
+    x_ = tf.stack(x_, axis=1)
 
     x_ = tf.zeros_like(means, dtype=tf.int32)
     return dists, x_
