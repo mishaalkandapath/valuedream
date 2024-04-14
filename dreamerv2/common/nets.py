@@ -453,7 +453,7 @@ class ShallowDecoder(Decoder):
     x_ = tf.split(x_, [3] * 10, -1)
     x_ = tf.stack(x_, axis=1)
 
-    x_ = tf.zeros_like(means, dtype=tf.int32)
+    # x_ = tf.zeros_like(means, dtype=tf.int32)
     return dists, x_
 
 
