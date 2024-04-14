@@ -291,6 +291,63 @@ class RecurrentDecoder(common.Module):
     return {"image": 
             tfd.Independent(tfd.Normal(swap(outputs), 1), 3) } # of shape 16, 240, 64, 64, 3
 
+class RecurrenShallowDecoder(common.Module):
+  def __init__(self, shapes, cnn_keys=r'.*', mlp_keys=r'.*', act='elu', norm='none', cnn_depth=48, cnn_kernels=(4, 4, 4, 4), mlp_layers=[400, 400, 400, 400]):
+    #this guy basically takes in a code vector + hidden_state + curr action and produces the image that should come next. 
+    #action noop (no-op, action code 0) is bascially for predicting the current image
+    print("SPECIAL DECODER MODE")
+    self.decoder = ShallowDecoder(shapes, cnn_keys, mlp_keys, act, norm, cnn_depth, cnn_kernels, mlp_layers, custom=True)
+    self._act = get_act(act)
+    self._norm = norm
+    self.cnn_keys = [
+        k for k, v in shapes.items() if re.match(cnn_keys, k) and len(v) == 3]
+    self._cell = GRUCell(300, norm=True) # it is the concatenation of the stochastic and determinisitic state TODO: Replace with variable
+  
+  def __call__(self, code_vec, actions, hor = 5):
+    #actions is a normal matrix of size 16, 50, 17. for each index, it is just that we need to consider actions form i to i+4
+    #swap to have time dimension at the first and batch at the rest for parallelism
+    swap = lambda x: tf.transpose(x, [1, 0] + list(range(2, len(x.shape))))
+
+    #swap them 
+    code_vec = swap(code_vec)
+    actions = swap(actions)
+    #cast vectors
+    code_vec = tf.cast(code_vec, prec.global_policy().compute_dtype)
+    actions = tf.cast(actions, prec.global_policy().compute_dtype)
+
+    zero_action = tf.zeros_like(actions[0]) # offset the actions by the zero action. now 
+
+    indices = actions.shape[0]
+
+    levels = defaultdict(lambda: [])
+    indices_map = defaultdict(lambda: [])
+    for idx in range(indices):
+      #for each time step we need to run this atmost 4 times
+      hidden = self._cell.get_initial_state(None, code_vec.shape[1], tf.float32) # restart hidden state for each run
+      code = code_vec[idx]
+      for i in range(hor):
+        if i >= indices - idx: continue 
+        action = zero_action if i == 0 else actions[idx+i] # run the next action code
+        new_in = self.get('rec_dec_in_norm', NormLayer, self._norm)(tf.concat([code, action], -1))
+        new_in = self._act(new_in)
+        _, hidden = self._cell(new_in, [hidden])
+        hidden = hidden[0]
+
+        #transform to 2048
+        altered_hidden = self.get("rec_dec_4_dec", tfkl.Dense, 2048)(hidden)
+        altered_hidden = self.get("rec_dec_4_dec_norm", NormLayer, self._norm)(altered_hidden)
+        altered_hidden = self._act(altered_hidden)
+        #run the decoder
+        outputs, indxs = self.decoder._cnn(altered_hidden)
+        levels[i].append(outputs)
+        indices_map[i].append(indxs)
+    
+    outputs = tf.concat([tf.stack(levels[l], 0) for l in levels], axis=0)
+    indices = tf.concat([tf.stack(indices_map[l], 0) for l in indices_map], axis=0)
+    # print("recurrent dcoder shape is ", outputs.shape)
+    return {"image": 
+            tfd.Independent(tfd.Normal(swap(outputs), 1), 3) }, swap(indices) # of shape 16, 240, 64, 64, 3
+
 class Decoder(common.Module):
 
   def __init__(
@@ -355,6 +412,35 @@ class Decoder(common.Module):
     for key, shape in shapes.items():
       dists[key] = self.get(f'dense_{key}', DistLayer, shape)(x)
     return dists
+
+
+class ShallowDecoder(Decoder):
+  def _cnn(self, features):
+    # print("in decoder we have features of shape {}".format(features.shape))
+    channels = {k: self._shapes[k][-1] for k in self.cnn_keys}
+    x = self.get('convdecoderin', tfkl.Dense, 16 * self._cnn_depth)(features)
+    x_ = x
+
+    x = self.get("sampledown1", tfkl.Dense, 600)(x)
+    x = self._act(x)
+    x = self.get("sampledown2", tfkl.Dense, 480)(x)
+    x = get_act("softmax")(x) * 255 # these are colours
+
+    x = x.reshape(features.shape[:-1] + (4, 4, 30))
+    means = tf.split(x, [30], -1)
+    # print("decoder output shape is {}".format(x.shape))
+    # dists = {
+    #     key: tfd.Independent(tfd.Normal(mean, 1), 3)
+    #     for (key, shape), mean in zip(channels.items(), means)}
+    dists = means[0]
+    
+    #attention indices:
+    x_ = self.get("attention_indices", tfkl.Dense, 480)(x_) # basically 10 boxes of size 4 x 4x 3.
+    x_ = get_act("softmax")(x) * 64*64*3 # convert to indices
+    #cast x_ to an integer type
+    x_ = tf.cast(x_, tf.int32)
+      
+    return dists, x_
 
 
 class MLP(common.Module):
