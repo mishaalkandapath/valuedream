@@ -186,6 +186,7 @@ def main():
     eval_driver(eval_policy, episodes=config.eval_eps)
     print('Start training.')
     train_driver(train_policy, steps=config.eval_every)
+    print('Saving variables.pkl')
     agnt.save(logdir / 'variables.pkl')
   for env in train_envs + eval_envs:
     try:

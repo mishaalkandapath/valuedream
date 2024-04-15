@@ -97,6 +97,11 @@ class Optimizer(tf.Module):
     # Find variables.
     modules = modules if hasattr(modules, '__len__') else (modules,)
     varibs = tf.nest.flatten([module.variables for module in modules])
+    
+    # if WM is passed in then truncate
+    if self._name == 'critic':
+      varibs = varibs[:-6]
+
     count = sum(np.prod(x.shape) for x in varibs)
     if self._once:
       print(f'Found {count} {self._name} parameters.')

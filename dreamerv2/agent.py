@@ -86,7 +86,7 @@ class WorldModel(common.Module):
   
   def __init__(self, config, obs_space, tfstep):
     shapes = {k: tuple(v.shape) for k, v in obs_space.items()}
-    self._changed = False
+    self._changed = True
     self.config = config
     self.tfstep = tfstep
     self.rssm = common.EnsembleRSSM(**config.rssm)
@@ -265,6 +265,7 @@ class ActorCritic(common.Module):
     # step onwards, which is the first imagined step. However, we are not
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
+    '''
     with tf.GradientTape() as actor_tape:
       with tf.GradientTape() as critic_tape:
           seq = world_model.imagine(self.actor, start, is_terminal, hor)
@@ -272,19 +273,34 @@ class ActorCritic(common.Module):
           seq['reward'], mets1 = self.rewnorm(reward)
           mets1 = {f'reward_{k}': v for k, v in mets1.items()}
           target, mets2 = self.target(seq)
-          critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
-          # critic_loss, mets4 = self.critic_loss(seq, target)
+          #critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
+          #Using old critic loss
+          critic_loss, mets4 = self.critic_loss(seq, target) #old
           actor_loss, mets3 = self.actor_loss(seq, target)
-    #Printing weights for debugging
-    # tf.print('pre-update')
-    model_weights = [var for var in world_model.rssm.trainable_variables]
-    # tf.print(model_weights[0])
-    metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm])) #Remove critic.loss from array to see weight update on just the world_model.rssm.
-    # tf.print('post-update')
-    model_weights = [var for var in world_model.rssm.trainable_variables]
-    # tf.print(model_weights[0])
+    '''
+    with tf.GradientTape() as actor_tape:
+        with tf.GradientTape() as critic_tape:
+            seq = world_model.imagine(self.actor, start, is_terminal, hor)
+            reward = reward_fn(seq)
+            seq['reward'], mets1 = self.rewnorm(reward)
+            mets1 = {f'reward_{k}': v for k, v in mets1.items()}
+            target, mets2 = self.target(seq)
+            critic_loss, mets4 = self.critic_loss(seq, target)
+        actor_loss, mets3 = self.actor_loss(seq, target)
+
     #Update the actor
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
+
+    #Printing weights for debugging
+    #tf.print('pre-update')
+    #model_weights = [var for var in world_model.rssm.trainable_variables]
+    #tf.print(model_weights[0])
+    
+    metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm])) #Remove self.critic from array to see weight update on just the world_model.rssm.
+    
+    #tf.print('post-update')
+    #model_weights = [var for var in world_model.rssm.trainable_variables]
+    #tf.print(model_weights[0])
     
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.

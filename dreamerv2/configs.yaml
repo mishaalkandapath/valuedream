@@ -15,7 +15,7 @@ defaults:
   log_every: 1e4
   eval_every: 1e5
   eval_eps: 1
-  prefill: 1e4 
+  prefill: 1e4
   pretrain: 1
   train_every: 6
   train_steps: 1
