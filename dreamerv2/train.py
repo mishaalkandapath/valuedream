@@ -32,8 +32,8 @@ def main():
   #configs = yaml.safe_load((
   #    pathlib.Path(sys.argv[0]).parent / 'configs.yaml').read_text())
   yaml_loader = yaml.YAML(typ="safe", pure=True)
-  # configs = yaml_loader.load((pathlib.Path('sys.argv[0]').parent / 'configs.yaml').read_text())
-  configs = yaml_loader.load(pathlib.Path('dreamerv2/configs.yaml').read_text())
+  configs = yaml_loader.load((pathlib.Path('sys.argv[0]').parent / 'configs.yaml').read_text())
+  # configs = yaml_loader.load(pathlib.Path('dreamerv2/configs.yaml').read_text())
   parsed, remaining = common.Flags(configs=['defaults']).parse(known_only=True)
   config = common.Config(configs['defaults'])
   config = config.update(configs['crafter'])
@@ -49,6 +49,8 @@ def main():
   tf.config.experimental_run_functions_eagerly(not config.jit)
   message = 'No GPU found. To actually train on CPU remove this assert.'
   #assert tf.config.experimental.list_physical_devices('GPU'), message
+  if tf.config.experimental.list_physical_devices('GPU'):
+    print("[WARNING] No GPU Found. Training on CPU.")
   for gpu in tf.config.experimental.list_physical_devices('GPU'):
     tf.config.experimental.set_memory_growth(gpu, True)
   assert config.precision in (16, 32), config.precision
