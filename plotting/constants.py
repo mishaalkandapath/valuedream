@@ -9,7 +9,7 @@ MAPPINGS = {
 
 BATCH_SIZE = 16
 
-CUR_LIST = ['itervaml', ]
+CUR_LIST = ['itervaml', 'mstep_itervaml']
 
 PLOT_DIR = f'plots{BATCH_SIZE}'
 

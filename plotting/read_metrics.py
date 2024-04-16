@@ -82,5 +82,5 @@ def print_summary(runs, budget, verbose):
 
 
 read_stats(
-    '../itervaml_stats/crafter_itervaml_r',
-    'score16', '', 'itervaml')
+    indir='../itervaml_stats/crafter_itervaml_r',
+    outdir='score16', task='', method='itervaml')
