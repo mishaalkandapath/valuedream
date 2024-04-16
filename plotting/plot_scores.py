@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 
 import common
 
-from constants import inpaths, legend, colors, PLOT_DIR
-
 def plot_scores(inpaths, outpath, legend, colors, budget=1e6, ylim=None):
   runs = common.load_runs(inpaths, budget)
   percents, methods, seeds, tasks = common.compute_success_rates(runs, budget)
@@ -47,4 +45,3 @@ def plot_scores(inpaths, outpath, legend, colors, budget=1e6, ylim=None):
   print(f'Saved {outpath}')
 
 
-plot_scores(inpaths, f'{PLOT_DIR}/scores-agents.pdf', legend, colors, ylim=12)

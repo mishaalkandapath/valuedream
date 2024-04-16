@@ -58,5 +58,4 @@ def plot_reward(inpaths, outpath, legend, colors, cols=4, budget=1e6):
   print(f'Saved {outpath}')
 
 
-from constants import inpaths, legend, colors, PLOT_DIR
-plot_reward(inpaths, f'{PLOT_DIR}/reward.pdf', legend, colors)
+

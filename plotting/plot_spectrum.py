@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import common
-from constants import inpaths, legend, colors, PLOT_DIR
 
 def plot_spectrum(inpaths, outpath, legend, colors, budget=1e6, sort=False):
   runs = common.load_runs(inpaths, budget)
@@ -49,4 +48,4 @@ def plot_spectrum(inpaths, outpath, legend, colors, budget=1e6, sort=False):
   print(f'Saved {outpath}')
 
 
-plot_spectrum(inpaths, f'{PLOT_DIR}/spectrum-reward.pdf', legend, colors)
+

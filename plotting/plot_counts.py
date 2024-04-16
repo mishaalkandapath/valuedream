@@ -41,8 +41,3 @@ def plot_counts(
   pathlib.Path(outpath).parent.mkdir(exist_ok=True, parents=True)
   fig.savefig(outpath)
   print(f'Saved {outpath}')
-
-from constants import inpaths, colors, CUR_LIST, PLOT_DIR
-
-for i in range(len(CUR_LIST)): 
-  plot_counts(inpaths[i], f'{PLOT_DIR}/{CUR_LIST[i]}_counts.pdf', colors[i])

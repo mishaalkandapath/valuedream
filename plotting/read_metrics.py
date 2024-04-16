@@ -13,15 +13,16 @@ def read_stats(indir, outdir, task, method, budget=int(1e6), verbose=False):
   runs = []
   print(f'Loading {indir.name}...')
   filenames = sorted(list(indir.glob('**/stats.jsonl')))
+  print(filenames)
   for index, filename in enumerate(filenames):
     if not filename.is_file():
       continue
     rewards, lengths, achievements = load_stats(filename, budget)
-    if sum(lengths) < budget - 1e4:
-      message = f'Skipping incomplete run ({sum(lengths)} < {budget} steps): '
-      message += f'{filename.relative_to(indir.parent)}'
-      print(f'==> {message}')
-      continue
+    # if sum(lengths) < budget - 1e4:
+    #   message = f'Skipping incomplete run ({sum(lengths)} < {budget} steps): '
+    #   message += f'{filename.relative_to(indir.parent)}'
+    #   print(f'==> {message}')
+    #   continue
     runs.append(dict(
         task=task,
         method=method,
@@ -81,6 +82,6 @@ def print_summary(runs, budget, verbose):
       print(f'{name:<20}  {np.mean(percent):6.2f}%')
 
 
-read_stats(
-    indir='../itervaml_stats/crafter_itervaml_r',
-    outdir='score16', task='', method='itervaml')
+# read_stats(
+#     indir='/Users/leeso/OneDrive - University of Toronto/Desktop/CSC/CSC4/project/stats/mstep_8',
+#     outdir='score16', task='', method='mstep')
