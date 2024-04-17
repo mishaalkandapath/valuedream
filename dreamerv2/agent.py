@@ -272,7 +272,7 @@ class ActorCritic(common.Module):
           seq['reward'], mets1 = self.rewnorm(reward)
           mets1 = {f'reward_{k}': v for k, v in mets1.items()}
           target, mets2 = self.target(seq)
-          if self.config.vaml_loss:
+          if self.config.itervaml:
             critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
           else:
             critic_loss, mets4 = self.critic_loss(seq, target)

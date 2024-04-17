@@ -1,9 +1,9 @@
 defaults:
 
   # Train Script
-  logdir: /dev/null
+  logdir: logs/
   seed: 0
-  task: dmc_walker_walk
+  task: crafter_reward
   envs: 1
   envs_parallel: none
   render_size: [64, 64]
@@ -64,7 +64,7 @@ defaults:
   slow_target_fraction: 1
   slow_baseline: True
   reward_norm: {momentum: 1.0, scale: 1.0, eps: 1e-8}
-  vaml_loss: False
+  itervaml: False
 
   # Exploration
   expl_intr_scale: 1.0
