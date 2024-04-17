@@ -34,7 +34,8 @@ Train (from `valuedream/` directory). The default log directory is `valuedream/l
 python3  dreamerv2/train.py  --logdir  /logdir/1
 
 ```
-As per our ablation study (isolating different components) you can add the following flags to enable different functionality.
+As per our ablation study (isolating different components) you can add any combination of the following three flags.
+`--itervaml True --wm_backpropvalue True --multistep True`
  
 You can monitor results with 
 ```
@@ -43,7 +44,5 @@ tensorboard --logdir logdir
  ### Metrics
 Generate plots:
 ```sh
-
 [TODO CODI]
-
 ```

@@ -64,7 +64,11 @@ defaults:
   slow_target_fraction: 1
   slow_baseline: True
   reward_norm: {momentum: 1.0, scale: 1.0, eps: 1e-8}
+  
+  # Modification Flags
   itervaml: False
+  wm_backpropvalue: False
+  multistep: False
 
   # Exploration
   expl_intr_scale: 1.0

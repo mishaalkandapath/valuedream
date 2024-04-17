@@ -86,13 +86,12 @@ class WorldModel(common.Module):
   
   def __init__(self, config, obs_space, tfstep):
     shapes = {k: tuple(v.shape) for k, v in obs_space.items()}
-    self._changed = False
     self.config = config
     self.tfstep = tfstep
     self.rssm = common.EnsembleRSSM(**config.rssm)
     self.encoder = common.Encoder(shapes, **config.encoder)
     self.heads = {}
-    self.heads['decoder'] = common.RecurrentDecoder(shapes, **config.decoder) if self._changed else common.Decoder(shapes, **config.decoder)
+    self.heads['decoder'] = common.RecurrentDecoder(shapes, **config.decoder) if self.config.multistep else common.Decoder(shapes, **config.decoder)
     self.heads['reward'] = common.MLP([], **config.reward_head)
     if config.pred_discount:
       self.heads['discount'] = common.MLP([], **config.discount_head)
@@ -277,21 +276,19 @@ class ActorCritic(common.Module):
           else:
             critic_loss, mets4 = self.critic_loss(seq, target)
           actor_loss, mets3 = self.actor_loss(seq, target)
-    #Printing weights for debugging
-    # tf.print('pre-update')
-    model_weights = [var for var in world_model.rssm.trainable_variables]
-    # tf.print(model_weights[0])
-    metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm])) #Remove critic.loss from array to see weight update on just the world_model.rssm.
-    # tf.print('post-update')
-    model_weights = [var for var in world_model.rssm.trainable_variables]
-    # tf.print(model_weights[0])
-    #Update the actor
+    
+    # Update the critic
+    if self.config.wm_backpropvalue:
+      metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm], critic_and_rssm=True))
+    else:
+      metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
+
+    # Update the actor
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
     
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.
-    #w2 = seq['weight']
-    #tf.print(tf.reduce_all(tf.equal(w1, w2)))
+    
     return metrics
 
   def actor_loss(self, seq, target):
@@ -345,16 +342,7 @@ class ActorCritic(common.Module):
     dist = self.critic(seq['feat'][:-1])
     target = tf.stop_gradient(target)
 
-    # --- modifications ---
-    # if self.config.prop_value_every is not None:
-    #   if self.tfstep % self.config.prop_value_every == 0:
-    #     weight = seq['weight']
-    #   else:
-    #     weight = tf.stop_gradient(seq['weight'])
-    
     weight = seq['weight']
-    # weight = tf.stop_gradient(seq['weight'])
-    # --- ------------- ---
 
     critic_loss = -(dist.log_prob(target) * weight[:-1]).mean()
     metrics = {'critic': dist.mode().mean()}

@@ -89,7 +89,7 @@ class Optimizer(tf.Module):
   def variables(self):
     return self._opt.variables()
 
-  def __call__(self, tape, loss, modules):
+  def __call__(self, tape, loss, modules, critic_and_rssm=False):
     assert loss.dtype is tf.float32, (self._name, loss.dtype)
     assert len(loss.shape) == 0, (self._name, loss.shape)
     metrics = {}
@@ -98,8 +98,8 @@ class Optimizer(tf.Module):
     modules = modules if hasattr(modules, '__len__') else (modules,)
     varibs = tf.nest.flatten([module.variables for module in modules])
 
-    # Remove NoneType gradients
-    if self._name == 'critic':
+    # Remove 6 NoneType gradients as they do not contribute to seq
+    if critic_and_rssm:
       varibs = varibs[:-6]
 
     count = sum(np.prod(x.shape) for x in varibs)
