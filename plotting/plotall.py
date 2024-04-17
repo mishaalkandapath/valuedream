@@ -26,6 +26,7 @@ MAPPINGS = {
     'mstep_value_latent16':["16 MultiStep Value-based Latents", '#8fa5f0'], 
     'mstep_itervaml16': ["16 MultiStep iterVAML", '#ff7575']
 }
+
 PLOT_DIR = f'plots'
 OUTDIR = f'score'
 inpaths = [f'{OUTDIR}/{x}.json' for x in METHODS]

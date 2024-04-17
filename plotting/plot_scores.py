@@ -55,7 +55,7 @@ def plot_scores_time(inpaths, outpath, legend, colors, cols=4, budget=1e6):
     legend = {x: x.replace('_', ' ').title() for x in methods}
   borders = np.arange(0, budget, 1e4)
   
-  basedreamermax = -1
+  basedreamermax = max_all = -1
   fig, ax = plt.subplots(figsize=(4.5, 2.3))
   for j, (method, label) in enumerate(legend.items()):
     relevant = [run for run in runs if run['method'] == method]
@@ -71,6 +71,7 @@ def plot_scores_time(inpaths, outpath, legend, colors, cols=4, budget=1e6):
     ys = np.concatenate(binned_ys)
     maxs = max(common.binning(xs, ys, borders, np.nanmax)[1])
     if "base" in method and maxs > basedreamermax: basedreamermax = maxs
+    if maxs > max_all: max_all = maxs
     # Compute mean and stddev over seeds.
     means = common.binning(xs, ys, borders, np.nanmean)[1]
     stds = common.binning(xs, ys, borders, np.nanstd)[1]
@@ -82,7 +83,7 @@ def plot_scores_time(inpaths, outpath, legend, colors, cols=4, budget=1e6):
   # add line for base dreamer
   ax.axhline(y=basedreamermax, c='#888888', ls='--', lw=1)
   ax.text(0.03e6, basedreamermax+.4, 'DreamverV2 best', c='#888888',fontsize="x-small")
-  # ax.set_ylim(0, 12)
+  ax.set_ylim(0, int(max_all+2))
 
   ax.set_title('Crafter Scores')
   ax.set_xlim(0, budget)
