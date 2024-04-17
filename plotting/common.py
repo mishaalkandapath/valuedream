@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 
 
-def load_runs(filenames, budget=1e6, verbose=True):
+def load_runs(filenames, budget=1e6, verbose=False):
   verbose and print('')
   runs = []
   for filename in filenames:
@@ -73,3 +73,14 @@ def binning(xs, ys, borders, reducer=np.nanmean, fill='nan'):
         value = np.nan
       binned.append(value)
   return borders[1:], np.array(binned)
+
+
+def cut_run(runs, max_index):
+  r = {}
+  for x in runs.keys(): 
+    if x in {"task", "method", "seed"}:
+      r[x] = runs[x]
+    else:
+      assert max_index + 1 <= len(runs[x])
+      r[x] = runs[x][:max_index+1]
+  return r

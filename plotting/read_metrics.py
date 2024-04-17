@@ -11,18 +11,16 @@ def read_stats(indir, outdir, task, method, budget=int(1e6), verbose=False):
   indir = pathlib.Path(indir)
   outdir = pathlib.Path(outdir)
   runs = []
-  print(f'Loading {indir.name}...')
-  filenames = sorted(list(indir.glob('**/stats.jsonl')))
-  print(filenames)
+  print(f'Loading {method} {indir.name}...')
+  filenames = sorted(list(indir.glob(f'**/{method}.jsonl')))
   for index, filename in enumerate(filenames):
     if not filename.is_file():
       continue
     rewards, lengths, achievements = load_stats(filename, budget)
-    # if sum(lengths) < budget - 1e4:
-    #   message = f'Skipping incomplete run ({sum(lengths)} < {budget} steps): '
-    #   message += f'{filename.relative_to(indir.parent)}'
-    #   print(f'==> {message}')
-    #   continue
+    if sum(lengths) < budget - 1e4:
+      message = f'Warning! Incomplete run ({sum(lengths)} < {budget} steps): '
+      message += f'{filename.relative_to(indir.parent)}'
+      print(f'==> {message}')
     runs.append(dict(
         task=task,
         method=method,
@@ -32,6 +30,16 @@ def read_stats(indir, outdir, task, method, budget=int(1e6), verbose=False):
         length=lengths,
         **achievements,
     ))
+  
+  # compute run scores
+  from tqdm import tqdm
+  for run in runs: 
+    scores = []
+    for i in tqdm(range(len(run["xs"]))):
+      p = common.compute_success_rates([common.cut_run(run, i)], budget)[0]
+      scores.append(common.compute_scores(p)[0][0])
+    run["scores"] = scores
+    
   if not runs:
     print('No completed runs.\n')
     return
@@ -83,5 +91,5 @@ def print_summary(runs, budget, verbose):
 
 
 # read_stats(
-#     indir='/Users/leeso/OneDrive - University of Toronto/Desktop/CSC/CSC4/project/stats/mstep_8',
-#     outdir='score16', task='', method='mstep')
+#     indir='/Users/leeso/OneDrive - University of Toronto/Desktop/CSC/CSC4/project/stats',
+#     outdir='score', task='', method='base16')

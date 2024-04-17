@@ -14,7 +14,8 @@ def plot_reward(inpaths, outpath, legend, colors, cols=4, budget=1e6):
     methods = sorted(set(run['method'] for run in runs))
     legend = {x: x.replace('_', ' ').title() for x in methods}
   borders = np.arange(0, budget, 1e4)
-
+  
+  basedreamermax = -1
   fig, ax = plt.subplots(figsize=(4.5, 2.3))
   for j, (method, label) in enumerate(legend.items()):
     relevant = [run for run in runs if run['method'] == method]
@@ -28,6 +29,8 @@ def plot_reward(inpaths, outpath, legend, colors, cols=4, budget=1e6):
       binned_ys.append(ys)
     xs = np.concatenate(binned_xs)
     ys = np.concatenate(binned_ys)
+    maxs = max(common.binning(xs, ys, borders, np.nanmax)[1])
+    if "base" in method and maxs > basedreamermax: basedreamermax = maxs
     # Compute mean and stddev over seeds.
     means = common.binning(xs, ys, borders, np.nanmean)[1]
     stds = common.binning(xs, ys, borders, np.nanstd)[1]
@@ -36,12 +39,13 @@ def plot_reward(inpaths, outpath, legend, colors, cols=4, budget=1e6):
     ax.fill_between(borders[1:], means - stds, means + stds, **kwargs)
     ax.plot(borders[1:], means, label=label, color=colors[j], zorder=100 - j)
 
-  ax.axhline(y=22, c='#888888', ls='--', lw=1)
-  ax.text(6.2e5, 18, 'Optimal', c='#888888')
+  # ax.axhline(y=22, c='#888888', ls='--', lw=1)
+  # ax.text(6.2e5, 18, 'Optimal', c='#888888')
   
   # add line for base dreamer
-  ax.axhline(y=22, c='#888888', ls='--', lw=1)
-  ax.text(6.2e5, 18, 'Optimal', c='#888888')
+  ax.axhline(y=basedreamermax, c='#888888', ls='--', lw=1)
+  ax.text(0.03e6, basedreamermax+.4, 'DreamverV2 best', c='#888888',fontsize="x-small")
+  ax.set_ylim(0, 12)
 
   ax.set_title('Crafter Reward')
   ax.set_xlim(0, budget)
