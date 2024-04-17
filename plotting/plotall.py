@@ -5,7 +5,7 @@ from plot_scores import plot_scores_hist, plot_scores_time
 from plot_spectrum import plot_spectrum
 
 # modify
-STATS_DIR = "/Users/leeso/OneDrive - University of Toronto/Desktop/CSC/CSC4/project/stats"
+STATS_DIR = "experiment_results"
 METHODS = ["1", "base8", "base16", "itervaml16", "mstep_itervaml8", "mstep8"]
 
 
@@ -27,8 +27,8 @@ MAPPINGS = {
     'mstep_itervaml16': ["16 MultiStep iterVAML", '#ff7575']
 }
 
-PLOT_DIR = f'plots'
-OUTDIR = f'score'
+PLOT_DIR = 'plots'
+OUTDIR = 'score'
 inpaths = [f'{OUTDIR}/{x}.json' for x in METHODS]
 legend = {x:MAPPINGS[x][0] for x in METHODS}
 colors = [MAPPINGS[x][1] for x in METHODS]
