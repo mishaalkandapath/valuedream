@@ -252,21 +252,32 @@ class ActorCritic(common.Module):
     # step onwards, which is the first imagined step. However, we are not
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
-    with tf.GradientTape() as actor_tape:
+    if self.config.wm_backpropvalue or self.config.itervaml:
       with tf.GradientTape() as critic_tape:
-          seq = world_model.imagine(self.actor, start, is_terminal, hor)
-          reward = reward_fn(seq)
-          seq['reward'], mets1 = self.rewnorm(reward)
-          mets1 = {f'reward_{k}': v for k, v in mets1.items()}
-          target, mets2 = self.target(seq)
-          if self.config.itervaml:
-            critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
-          else:
-            critic_loss, mets4 = self.critic_loss(seq, target)
-          actor_loss, mets3 = self.actor_loss(seq, target)
+        with tf.GradientTape() as actor_tape:
+            seq = world_model.imagine(self.actor, start, is_terminal, hor)
+            reward = reward_fn(seq)
+            seq['reward'], mets1 = self.rewnorm(reward)
+            mets1 = {f'reward_{k}': v for k, v in mets1.items()}
+            target, mets2 = self.target(seq)
+            if self.config.itervaml:
+              critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
+            else:
+              critic_loss, mets4 = self.critic_loss(seq, target)
+            actor_loss, mets3 = self.actor_loss(seq, target)
+    else: 
+      with tf.GradientTape() as actor_tape:
+        seq = world_model.imagine(self.actor, start, is_terminal, hor)
+        reward = reward_fn(seq)
+        seq['reward'], mets1 = self.rewnorm(reward)
+        mets1 = {f'reward_{k}': v for k, v in mets1.items()}
+        target, mets2 = self.target(seq)
+        with tf.GradientTape() as critic_tape:
+          critic_loss, mets4 = self.critic_loss(seq, target)
+        actor_loss, mets3 = self.actor_loss(seq, target)
     
     # Update the critic
-    if self.config.wm_backpropvalue:
+    if self.config.wm_backpropvalue or self.config.itervaml:
       metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm], critic_and_rssm=True))
     else:
       metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
