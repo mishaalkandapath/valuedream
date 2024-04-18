@@ -2,7 +2,7 @@
 This is a project for CSC413: Neural Networks and Deep Learning at the University of Toronto. We investigate different methods to incorporate value into the DreamerV2 model, which performed well on long-term reward environments in RL. This repository is forked from the implementation of the DreamerV2 agent in TensorFlow 2, whose code can be found [here](https://github.com/danijar/dreamerv2).
 
 <p align="center">
-<img width="90%" src="https://github.com/mishaalkandapath/valuedream/blob/main/examples/agentgif.gif">
+<img width="30%" src="https://github.com/mishaalkandapath/valuedream/blob/main/examples/agentgif.gif">
 </p>
 
 ## Contributions
@@ -49,7 +49,14 @@ You can plot the results using the following script. Modify the `STATS_DIR` and 
 python3 plotting/plotall.py
 ```
 
-### Results
-![Returns over time](https://github.com/mishaalkandapath/valuedream/blob/main/plots/reward.png)
-![Score over time](https://github.com/mishaalkandapath/valuedream/blob/main/plots/scores_time.png)
-![Spectrum of achievements at 1M steps](https://github.com/mishaalkandapath/valuedream/blob/main/plots/spectrum-reward.png)
+### Some Results
+<p align="center">
+ <img width="50%" src="https://github.com/mishaalkandapath/valuedream/blob/main/plots/reward.png"><br>
+ Returns over time<br>
+ <img width="50%" src="https://github.com/mishaalkandapath/valuedream/blob/main/plots/score.png"><br>
+ Scores over time<br>
+ <img width="50%" src="https://github.com/mishaalkandapath/valuedream/blob/main/plots/score-big.png"><br>
+ Spectrum of achievements at 1M steps<br>
+</p>
+
+
