@@ -1,6 +1,10 @@
 # Incorporating Multistep Prediction and Value into DreamerV2
 This is a project for CSC413: Neural Networks and Deep Learning at the University of Toronto. We investigate different methods to incorporate value into the DreamerV2 model, which performed well on long-term reward environments in RL. This repository is forked from the implementation of the DreamerV2 agent in TensorFlow 2, whose code can be found [here](https://github.com/danijar/dreamerv2).
 
+<p align="center">
+<img width="90%" src="https://github.com/mishaalkandapath/valuedream/blob/main/examples/agentgif.gif">
+</p>
+
 ## Contributions
 Our project paper highlighting the details of this work can be downloaded here [PDF Upload Link]. Our main contributions (modifications) to the existing architecture are the following: <Br>
 **Contribution 1- Value-Aware Dreamer:** We strived to train world models that are informed by the value
@@ -10,7 +14,6 @@ Our project paper highlighting the details of this work can be downloaded here [
 **Contribution 2- Multistep Prediction:** We hypothesized that representations which embody information about the future are more apt for future planning
 - We work to integrate multi step awareness into the hidden states by encoding training individual hidden states to be reconstructable into several observations into the future.
 
-(https://github.com/mishaalkandapath/valuedream/blob/main/examples/agentgif.gif)
 ## Reproducing Results
 ### Installation
 Perhaps the easiest way to install all necessary packages would be to build a conda/virtualenv environment from our yaml/txt file, which was used on our VMs to run experiments. 
@@ -47,6 +50,6 @@ python3 plotting/plotall.py
 ```
 
 ### Results
-![Returns over time](https://github.com/mishaalkandapath/valuedream/blob/main/plots/reward.pdf)
-![Score over time](https://github.com/mishaalkandapath/valuedream/blob/main/plots/scores_time.pdf)
-![Spectrum of achievements at 1M steps](https://github.com/mishaalkandapath/valuedream/blob/main/plots/spectrum-reward.pdf)
+![Returns over time](https://github.com/mishaalkandapath/valuedream/blob/main/plots/reward.png)
+![Score over time](https://github.com/mishaalkandapath/valuedream/blob/main/plots/scores_time.png)
+![Spectrum of achievements at 1M steps](https://github.com/mishaalkandapath/valuedream/blob/main/plots/spectrum-reward.png)
