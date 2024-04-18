@@ -40,7 +40,7 @@ You can monitor results with
 tensorboard --logdir logdir
 ```
  ### Metrics
-Generate plots:
+You can plot the results using the following script. Modify the `STATS_DIR` and `METHODS` list in `plotall.py` to decide which results you want displayed after training.
 ```sh
 python3 plotting/plotall.py
 ```
