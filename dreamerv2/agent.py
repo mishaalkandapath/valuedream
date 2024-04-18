@@ -138,12 +138,12 @@ class WorldModel(common.Module):
       # print("heyy ", name)
       grad_head = (name in self.config.grad_heads)
       inp = feat if grad_head else tf.stop_gradient(feat)
-      out = head(inp, data["action"]) if name == "decoder" and self._changed else head(inp)
+      out = head(inp, data["action"]) if name == "decoder" and self.config.multistep else head(inp)
       # print("DONE HEAD {}".format(name))
       dists = out if isinstance(out, dict) else {name: out}
       # print("for head {} we have {} ".format(name, list(dists.keys())))
       for key, dist in dists.items(): #loss on the log probability of the true vakue being observed under the predicted distribution for all the heads
-        if name == "decoder" and self._changed:
+        if name == "decoder" and self.config.multistep:
           like = tf.cast(dist.log_prob(self.multi_step_helper(data)), tf.float32)
         else: like = tf.cast(dist.log_prob(data[key]), tf.float32)
         likes[key] = like
@@ -219,11 +219,11 @@ class WorldModel(common.Module):
     embed = self.encoder(data)
     states, _ = self.rssm.observe(
         embed[:6, :5], data['action'][:6, :5], data['is_first'][:6, :5])
-    if self._changed: recon = decoder(self.rssm.get_feat(states), data['action'][:6, :5], hor=1)[key].mode()[:6]
+    if self.config.multistep: recon = decoder(self.rssm.get_feat(states), data['action'][:6, :5], hor=1)[key].mode()[:6]
     else: recon = decoder(self.rssm.get_feat(states))[key].mode()[:6]
     init = {k: v[:, -1] for k, v in states.items()}
     prior = self.rssm.imagine(data['action'][:6, 5:], init)
-    if self._changed: openl = decoder(self.rssm.get_feat(prior), data['action'][:6, 5:], hor=1)[key].mode()
+    if self.config.multistep: openl = decoder(self.rssm.get_feat(prior), data['action'][:6, 5:], hor=1)[key].mode()
     else: openl = decoder(self.rssm.get_feat(prior))[key].mode()
     model = tf.concat([recon[:, :5] + 0.5, openl + 0.5], 1)
     error = (model - truth + 1) / 2
