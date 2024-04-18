@@ -45,7 +45,7 @@ def plot_reward(inpaths, outpath, legend, colors, cols=4, budget=1e6):
   
   # add line for base dreamer
   ax.axhline(y=basedreamermax, c='#888888', ls='--', lw=1)
-  ax.text(0.03e6, basedreamermax+.4, 'DreamverV2 best', c='#888888',fontsize="x-small")
+  ax.text(0.03e6, basedreamermax+.4, 'DreamerV2 best', c='#888888',fontsize="x-small")
   ax.set_ylim(0, int(max_all+2))
 
   ax.set_title('Crafter Reward')

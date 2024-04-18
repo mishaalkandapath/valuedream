@@ -6,8 +6,9 @@ from plot_spectrum import plot_spectrum
 
 # modify
 STATS_DIR = "experiment_results"
-METHODS = ["1", "base8", "base16", "itervaml16", "mstep_itervaml8", "mstep8", 
-           "mstep_backpropwm8", "mstep_itervaml16", "mstep16"]
+# METHODS = ["1", "base8", "base16", "itervaml16", "mstep_itervaml8", "mstep8", 
+#            "mstep_backpropwm8", "mstep_itervaml16", "mstep16"]
+METHODS = ["base16", "itervaml16", "mstep_itervaml16", "mstep16"]
 
 
 ## keep
@@ -37,15 +38,15 @@ colors = [MAPPINGS[x][1] for x in METHODS]
 
 if __name__ == "__main__":
     # generate stats
-    for x in ["mstep_backpropwm8", "mstep_itervaml16", "mstep16"]: 
-        read_stats(indir=STATS_DIR, outdir=OUTDIR, task='', method=x)
+    # for x in METHODS: 
+    #     read_stats(indir=STATS_DIR, outdir=OUTDIR, task='', method=x)
     
     # plot
-    plot_counts(inpaths[0], f'{PLOT_DIR}/{METHODS[0]}_counts.pdf', colors[0], budget=670000) #654604
-    for i in range(1, len(METHODS)): plot_counts(inpaths[i], f'{PLOT_DIR}/{METHODS[i]}_counts.pdf', colors[i])
-    plot_reward(inpaths, f'{PLOT_DIR}/reward.pdf', legend, colors)
-    plot_scores_hist(inpaths, f'{PLOT_DIR}/scores_hist.pdf', legend, colors, ylim=12)
-    plot_scores_time(inpaths, f'{PLOT_DIR}/scores_time.pdf', legend, colors)
-    plot_spectrum(inpaths, f'{PLOT_DIR}/spectrum-reward.pdf', legend, colors)
+    # plot_counts(inpaths[0], f'{PLOT_DIR}/{METHODS[0]}_counts.pdf', colors[0], budget=670000) #654604
+    for i in range(0, len(METHODS)): plot_counts(inpaths[i], f'{PLOT_DIR}/{METHODS[i]}_counts.pdf', colors[i])
+    # plot_reward(inpaths, f'{PLOT_DIR}/reward.pdf', legend, colors)
+    # plot_scores_hist(inpaths, f'{PLOT_DIR}/scores_hist.pdf', legend, colors, ylim=12)
+    # plot_scores_time(inpaths, f'{PLOT_DIR}/scores_time.pdf', legend, colors)
+    # plot_spectrum(inpaths, f'{PLOT_DIR}/spectrum-reward.pdf', legend, colors)
 
 
