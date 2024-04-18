@@ -337,6 +337,8 @@ class ActorCritic(common.Module):
     return critic_loss, metrics
   
   def critic_itervaml(self, seq, code_vecs):
+    # implementation of itervaml loss function for dreamer
+
     weight = seq['weight']
     reshape_weights = self.reshape_seq(weight[:-1], code_vecs.shape[1], code_vecs.shape[0])
     
