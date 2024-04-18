@@ -44,3 +44,8 @@ You can plot the results using the following script. Modify the `STATS_DIR` and 
 ```sh
 python3 plotting/plotall.py
 ```
+
+### Results
+![Returns over time](https://github.com/mishaalkandapath/valuedream/blob/main/plots/reward.pdf)
+![Score over time](https://github.com/mishaalkandapath/valuedream/blob/main/plots/scores_time.pdf)
+![Spectrum of achievements at 1M steps](https://github.com/mishaalkandapath/valuedream/blob/main/plots/spectrum-reward.pdf)
