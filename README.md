@@ -10,6 +10,7 @@ Our project paper highlighting the details of this work can be downloaded here [
 **Contribution 2- Multistep Prediction:** We hypothesized that representations which embody information about the future are more apt for future planning
 - We work to integrate multi step awareness into the hidden states by encoding training individual hidden states to be reconstructable into several observations into the future.
 
+(https://github.com/mishaalkandapath/valuedream/blob/main/examples/agentgif.gif)
 ## Reproducing Results
 ### Installation
 Perhaps the easiest way to install all necessary packages would be to build a conda/virtualenv environment from our yaml/txt file, which was used on our VMs to run experiments. 
