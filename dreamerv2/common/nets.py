@@ -271,6 +271,8 @@ class RecurrentDecoder(common.Module):
         action = zero_action if i == 0 else actions[idx+i] # run the next action code
         new_in = self.get('rec_dec_in_norm', NormLayer, self._norm)(tf.concat([code, action], -1))
         new_in = self._act(new_in)
+        new_in = tf.cast(new_in, prec.global_policy().compute_dtype)
+        hidden = tf.cast(hidden, prec.global_policy().compute_dtype)
         _, hidden = self._cell(new_in, [hidden])
         hidden = hidden[0]
 
