@@ -69,7 +69,7 @@ class Agent(common.Module):
       mets = self._expl_behavior.train(start, outputs, data)[-1]
       metrics.update({'expl_' + key: value for key, value in mets.items()})
     w2 = self._task_behavior.critic.variables
-    # tf.print(all([tf.reduce_all(tf.equal(w1[i], w2[i])) for i in range(len(w1))]))
+    # tf.self.config.multistep(all([tf.reduce_all(tf.equal(w1[i], w2[i])) for i in range(len(w1))]))
     return state, metrics
 
   @tf.function
@@ -103,10 +103,8 @@ class WorldModel(common.Module):
   def train(self, data, state=None):
     with tf.GradientTape() as model_tape:
       model_loss, state, outputs, metrics = self.loss(data, state)
-    # print("DONE INFERENCE PART")
     modules = [self.encoder, self.rssm, *self.heads.values()]
     metrics.update(self.model_opt(model_tape, model_loss, modules))
-    # print("DONE UPDATE")
     return state, outputs, metrics
 
   def multi_step_helper(self, data):
@@ -118,16 +116,10 @@ class WorldModel(common.Module):
     return swap(new_images)    
 
   def loss(self, data, state=None):
-    # print("At Loss, data shape: {} {}".format(data["image"].shape, data["action"].shape))
-    # with tf.Session() as sess: print("the first few actions are {}".format(data["action"][0, 0:3].eval())) 
     data = self.preprocess(data)
     embed = self.encoder(data)
-    # print("PROCESSED WITH ENCODER")
-    # print("state is none? {}".format(state is None))
-    # print("but we have data of shape {}".format(data["image"].shape))  
     post, prior = self.rssm.observe(
         embed, data['action'], data['is_first'], state)
-    # print("DONE OBSERVING")
     kl_loss, kl_value = self.rssm.kl_loss(post, prior, **self.config.kl) # kl loss between post and prior
     assert len(kl_loss.shape) == 0
     likes = {}
@@ -135,20 +127,16 @@ class WorldModel(common.Module):
     feat = self.rssm.get_feat(post)
     self.post_feat = tf.stop_gradient(feat)
     for name, head in self.heads.items():
-      # print("heyy ", name)
       grad_head = (name in self.config.grad_heads)
       inp = feat if grad_head else tf.stop_gradient(feat)
       out = head(inp, data["action"]) if name == "decoder" and self.config.multistep else head(inp)
-      # print("DONE HEAD {}".format(name))
       dists = out if isinstance(out, dict) else {name: out}
-      # print("for head {} we have {} ".format(name, list(dists.keys())))
       for key, dist in dists.items(): #loss on the log probability of the true vakue being observed under the predicted distribution for all the heads
         if name == "decoder" and self.config.multistep:
           like = tf.cast(dist.log_prob(self.multi_step_helper(data)), tf.float32)
         else: like = tf.cast(dist.log_prob(data[key]), tf.float32)
         likes[key] = like
         losses[key] = -like.mean()
-      # print("DONE LOSS {}".format(name))
     model_loss = sum(
         self.config.loss_scales.get(k, 1.0) * v for k, v in losses.items())
     outs = dict(
@@ -350,26 +338,21 @@ class ActorCritic(common.Module):
   
   def critic_itervaml(self, seq, code_vecs):
     weight = seq['weight']
-    # print("WEIGHTS", weight[:-1])    # (hor,batch*seqlen)
     reshape_weights = self.reshape_seq(weight[:-1], code_vecs.shape[1], code_vecs.shape[0])
-    # print("WEIGHTS RESHAPED", reshape_weights) # currently: (260,)
     
     # first reshape seq["feat"][:-1] to be a vector
     restructured_seq = self.reshape_seq(seq["feat"][:-1], code_vecs.shape[1], code_vecs.shape[0])
     # call the critic on it to get distribution
-    # print("RESTRUCTURED SEQ", seq["feat"][:-1], restructured_seq)
     dist = self.critic(restructured_seq)
     
     # next reshape code_vecs to be a vector, call dist on it, get mean
     restructured_post = self.itervaml_helper(code_vecs)
-    # print("RESTRUCTURED POST", code_vecs, restructured_post)
     
     # -log_prob.mean()
     # NOTE: using expected value from post val dist, but is KL better? 
     estimated_code_value = self.critic(restructured_post).mean() 
     neg_loglike = -(dist.log_prob(estimated_code_value * reshape_weights))
     
-    # print("NEGLOGLIKE::", neg_loglike)
     critic_loss = neg_loglike.mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics

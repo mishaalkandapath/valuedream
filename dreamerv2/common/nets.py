@@ -238,7 +238,6 @@ class RecurrentDecoder(common.Module):
   def __init__(self, shapes, cnn_keys=r'.*', mlp_keys=r'.*', act='elu', norm='none', cnn_depth=48, cnn_kernels=(4, 4, 4, 4), mlp_layers=[400, 400, 400, 400]):
     #this guy basically takes in a code vector + hidden_state + curr action and produces the image that should come next. 
     #action noop (no-op, action code 0) is bascially for predicting the current image
-    print("SPECIAL DECODER MODE")
     self.decoder = Decoder(shapes, cnn_keys, mlp_keys, act, norm, cnn_depth, cnn_kernels, mlp_layers, custom=True)
     self._act = get_act(act)
     self._norm = norm
