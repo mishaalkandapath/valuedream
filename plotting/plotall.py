@@ -6,24 +6,25 @@ from plot_spectrum import plot_spectrum
 
 # modify
 STATS_DIR = "experiment_results"
-METHODS = ["1", "base8", "base16", "itervaml16", "mstep_itervaml8", "mstep8"]
+METHODS = ["1", "base8", "base16", "itervaml16", "mstep_itervaml8", "mstep8", 
+           "mstep_backpropwm8", "mstep_itervaml16", "mstep16"]
 
 
 ## keep
 MAPPINGS = {
     '1':["1", '#00323a'], 
     'base8': ['8 DreamerV2', '#0d9937'], 
-    'value_latent8':["8 Value-based Latents", '#ba9872'], 
+    'backpropwm8':["8 Backprop World Model", '#ba9872'], 
     'itervaml8':['8 iterVAML', '#f6bf1d'], 
     'mstep8': ['8 MultiStep', '#26cdd6'], 
-    'mstep_value_latent8':["8 MultiStep Value-based Latents", '#1958ea'], 
+    'mstep_backpropwm8':["8 MultiStep Backprop to WM", '#1958ea'], 
     'mstep_itervaml8': ["8 MultiStep iterVAML", '#cc1d0a'],
     
     'base16': ['16 DreamerV2', '#63f78f'], 
-    'value_latent16':["16 Value-based Latents", '#eddfc9'], 
+    'backpropwm16':["16 Backprop to WM", '#eddfc9'], 
     'itervaml16':['16 iterVAML', '#f2d974'], 
     'mstep16': ['16 MultiStep', '#82f4fa'], 
-    'mstep_value_latent16':["16 MultiStep Value-based Latents", '#8fa5f0'], 
+    'mstep_backpropwm16':["16 MultiStep Backprop to WM", '#8fa5f0'], 
     'mstep_itervaml16': ["16 MultiStep iterVAML", '#ff7575']
 }
 
@@ -36,7 +37,8 @@ colors = [MAPPINGS[x][1] for x in METHODS]
 
 if __name__ == "__main__":
     # generate stats
-    for x in METHODS: read_stats(indir=STATS_DIR, outdir=OUTDIR, task='', method=x)
+    for x in ["mstep_backpropwm8", "mstep_itervaml16", "mstep16"]: 
+        read_stats(indir=STATS_DIR, outdir=OUTDIR, task='', method=x)
     
     # plot
     plot_counts(inpaths[0], f'{PLOT_DIR}/{METHODS[0]}_counts.pdf', colors[0], budget=670000) #654604
