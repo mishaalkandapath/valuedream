@@ -8,9 +8,11 @@ dependencies:
   - blas=1.0=mkl
   - ca-certificates=2024.2.2=hbcca054_0
   - cloudpickle=3.0.0=pyhd8ed1ab_0
+  # - cudatoolkit=12.0.0
+  - cudnn=8.1.0.77
   - cudatoolkit=11.2.2=hc23eb0c_13
-  - cudnn=8.1.0.77=h90431f1_0
-  - gym=0.21.0=py39hef51801_2
+  # - cudnn=8.1.0.77=h90431f1_0
+  # - gym=0.21.0=py39hef51801_2
   - intel-openmp=2023.1.0=hdb19cb5_46306
   - ld_impl_linux-64=2.38=h1181459_1
   - libffi=3.4.4=h6a678d5_0
@@ -40,6 +42,13 @@ dependencies:
   - xz=5.4.6=h5eee18b_0
   - zlib=1.2.13=h5eee18b_0
   - pip:
+      - gym==0.17.2
+      - atari-py==0.2.9
+      # - gym_minigrid==0.0.1
+      - gym[atari, accept-rom-license]==0.17.2
+      - pandas==1.4.3
+      - matplotlib==3.6.3
+      - numpy==1.19.5
       - absl-py==0.15.0
       - astunparse==1.6.3
       - clang==5.0
@@ -57,7 +66,7 @@ dependencies:
       - keras-preprocessing==1.1.2
       - markdown==3.5.2
       - markupsafe==2.1.5
-      - opensimplex==0.4.5
+      - opensimplex==0.3
       - opt-einsum==3.3.0
       - pillow==10.2.0
       - protobuf==3.20.3

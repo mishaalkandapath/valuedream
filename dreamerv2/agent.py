@@ -4,6 +4,7 @@ from tensorflow.keras import mixed_precision as prec
 import common
 import expl
 
+import numpy as np
 
 class Agent(common.Module):
 
@@ -14,7 +15,7 @@ class Agent(common.Module):
     self.step = step
     self.tfstep = tf.Variable(int(self.step), tf.int64)
     self.wm = WorldModel(config, obs_space, self.tfstep)
-    self._task_behavior = ActorCritic(config, self.act_space, self.tfstep)
+    self._task_behavior = ActorCritic(config, self.act_space, self.tfstep) #actor critic here!
     if config.expl_behavior == 'greedy':
       self._expl_behavior = self._task_behavior
     else:
@@ -61,11 +62,14 @@ class Agent(common.Module):
     metrics.update(mets)
     start = outputs['post']
     reward = lambda seq: self.wm.heads['reward'](seq['feat']).mode()
+    w1 = self._task_behavior.critic.variables
     metrics.update(self._task_behavior.train(
         self.wm, start, data['is_terminal'], reward))
     if self.config.expl_behavior != 'greedy':
       mets = self._expl_behavior.train(start, outputs, data)[-1]
       metrics.update({'expl_' + key: value for key, value in mets.items()})
+    w2 = self._task_behavior.critic.variables
+    # tf.self.config.multistep(all([tf.reduce_all(tf.equal(w1[i], w2[i])) for i in range(len(w1))]))
     return state, metrics
 
   @tf.function
@@ -79,7 +83,7 @@ class Agent(common.Module):
 
 
 class WorldModel(common.Module):
-
+  
   def __init__(self, config, obs_space, tfstep):
     shapes = {k: tuple(v.shape) for k, v in obs_space.items()}
     self.config = config
@@ -87,13 +91,14 @@ class WorldModel(common.Module):
     self.rssm = common.EnsembleRSSM(**config.rssm)
     self.encoder = common.Encoder(shapes, **config.encoder)
     self.heads = {}
-    self.heads['decoder'] = common.Decoder(shapes, **config.decoder)
+    self.heads['decoder'] = common.RecurrentDecoder(shapes, **config.decoder) if self.config.multistep else common.Decoder(shapes, **config.decoder)
     self.heads['reward'] = common.MLP([], **config.reward_head)
     if config.pred_discount:
       self.heads['discount'] = common.MLP([], **config.discount_head)
     for name in config.grad_heads:
       assert name in self.heads, name
     self.model_opt = common.Optimizer('model', **config.model_opt)
+    self.post_feat = None
 
   def train(self, data, state=None):
     with tf.GradientTape() as model_tape:
@@ -102,23 +107,34 @@ class WorldModel(common.Module):
     metrics.update(self.model_opt(model_tape, model_loss, modules))
     return state, outputs, metrics
 
+  def multi_step_helper(self, data):
+    #convert the matrix into what we want:
+    swap = lambda x: tf.transpose(x, [1, 0] + list(range(2, len(x.shape))))
+    images = data["image"]
+    images = swap(images)
+    new_images = tf.concat([images[i:, :] for i in range(0, 5)], 0)
+    return swap(new_images)    
+
   def loss(self, data, state=None):
     data = self.preprocess(data)
     embed = self.encoder(data)
     post, prior = self.rssm.observe(
         embed, data['action'], data['is_first'], state)
-    kl_loss, kl_value = self.rssm.kl_loss(post, prior, **self.config.kl)
+    kl_loss, kl_value = self.rssm.kl_loss(post, prior, **self.config.kl) # kl loss between post and prior
     assert len(kl_loss.shape) == 0
     likes = {}
     losses = {'kl': kl_loss}
     feat = self.rssm.get_feat(post)
+    self.post_feat = tf.stop_gradient(feat)
     for name, head in self.heads.items():
       grad_head = (name in self.config.grad_heads)
       inp = feat if grad_head else tf.stop_gradient(feat)
-      out = head(inp)
+      out = head(inp, data["action"]) if name == "decoder" and self.config.multistep else head(inp)
       dists = out if isinstance(out, dict) else {name: out}
-      for key, dist in dists.items():
-        like = tf.cast(dist.log_prob(data[key]), tf.float32)
+      for key, dist in dists.items(): #loss on the log probability of the true vakue being observed under the predicted distribution for all the heads
+        if name == "decoder" and self.config.multistep:
+          like = tf.cast(dist.log_prob(self.multi_step_helper(data)), tf.float32)
+        else: like = tf.cast(dist.log_prob(data[key]), tf.float32)
         likes[key] = like
         losses[key] = -like.mean()
     model_loss = sum(
@@ -191,10 +207,12 @@ class WorldModel(common.Module):
     embed = self.encoder(data)
     states, _ = self.rssm.observe(
         embed[:6, :5], data['action'][:6, :5], data['is_first'][:6, :5])
-    recon = decoder(self.rssm.get_feat(states))[key].mode()[:6]
+    if self.config.multistep: recon = decoder(self.rssm.get_feat(states), data['action'][:6, :5], hor=1)[key].mode()[:6]
+    else: recon = decoder(self.rssm.get_feat(states))[key].mode()[:6]
     init = {k: v[:, -1] for k, v in states.items()}
     prior = self.rssm.imagine(data['action'][:6, 5:], init)
-    openl = decoder(self.rssm.get_feat(prior))[key].mode()
+    if self.config.multistep: openl = decoder(self.rssm.get_feat(prior), data['action'][:6, 5:], hor=1)[key].mode()
+    else: openl = decoder(self.rssm.get_feat(prior))[key].mode()
     model = tf.concat([recon[:, :5] + 0.5, openl + 0.5], 1)
     error = (model - truth + 1) / 2
     video = tf.concat([truth, model, error], 2)
@@ -234,19 +252,42 @@ class ActorCritic(common.Module):
     # step onwards, which is the first imagined step. However, we are not
     # training the action that led into the first step anyway, so we can use
     # them to scale the whole sequence.
-    with tf.GradientTape() as actor_tape:
-      seq = world_model.imagine(self.actor, start, is_terminal, hor)
-      reward = reward_fn(seq)
-      seq['reward'], mets1 = self.rewnorm(reward)
-      mets1 = {f'reward_{k}': v for k, v in mets1.items()}
-      target, mets2 = self.target(seq)
-      actor_loss, mets3 = self.actor_loss(seq, target)
-    with tf.GradientTape() as critic_tape:
-      critic_loss, mets4 = self.critic_loss(seq, target)
+    if self.config.wm_backpropvalue or self.config.itervaml:
+      with tf.GradientTape() as critic_tape:
+        with tf.GradientTape() as actor_tape:
+            seq = world_model.imagine(self.actor, start, is_terminal, hor)
+            reward = reward_fn(seq)
+            seq['reward'], mets1 = self.rewnorm(reward)
+            mets1 = {f'reward_{k}': v for k, v in mets1.items()}
+            target, mets2 = self.target(seq)
+            if self.config.itervaml:
+              critic_loss, mets4 = self.critic_itervaml(seq, world_model.post_feat)
+            else:
+              critic_loss, mets4 = self.critic_loss(seq, target)
+            actor_loss, mets3 = self.actor_loss(seq, target)
+    else: 
+      with tf.GradientTape() as actor_tape:
+        seq = world_model.imagine(self.actor, start, is_terminal, hor)
+        reward = reward_fn(seq)
+        seq['reward'], mets1 = self.rewnorm(reward)
+        mets1 = {f'reward_{k}': v for k, v in mets1.items()}
+        target, mets2 = self.target(seq)
+        with tf.GradientTape() as critic_tape:
+          critic_loss, mets4 = self.critic_loss(seq, target)
+        actor_loss, mets3 = self.actor_loss(seq, target)
+    
+    # Update the critic
+    if self.config.wm_backpropvalue or self.config.itervaml:
+      metrics.update(self.critic_opt(critic_tape, critic_loss, [self.critic, world_model.rssm], critic_and_rssm=True))
+    else:
+      metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
+
+    # Update the actor
     metrics.update(self.actor_opt(actor_tape, actor_loss, self.actor))
-    metrics.update(self.critic_opt(critic_tape, critic_loss, self.critic))
+    
     metrics.update(**mets1, **mets2, **mets3, **mets4)
     self.update_slow_target()  # Variables exist after first forward pass.
+    
     return metrics
 
   def actor_loss(self, seq, target):
@@ -299,10 +340,62 @@ class ActorCritic(common.Module):
     # Loss:        l0    l1    l2
     dist = self.critic(seq['feat'][:-1])
     target = tf.stop_gradient(target)
-    weight = tf.stop_gradient(seq['weight'])
+
+    weight = seq['weight']
+
     critic_loss = -(dist.log_prob(target) * weight[:-1]).mean()
     metrics = {'critic': dist.mode().mean()}
     return critic_loss, metrics
+  
+  def critic_itervaml(self, seq, code_vecs):
+    # implementation of itervaml loss function for dreamer
+
+    weight = seq['weight']
+    reshape_weights = self.reshape_seq(weight[:-1], code_vecs.shape[1], code_vecs.shape[0])
+    
+    # first reshape seq["feat"][:-1] to be a vector
+    restructured_seq = self.reshape_seq(seq["feat"][:-1], code_vecs.shape[1], code_vecs.shape[0])
+    # call the critic on it to get distribution
+    dist = self.critic(restructured_seq)
+    
+    # next reshape code_vecs to be a vector, call dist on it, get mean
+    restructured_post = self.itervaml_helper(code_vecs)
+    
+    # -log_prob.mean()
+    # NOTE: using expected value from post val dist, but is KL better? 
+    estimated_code_value = self.critic(restructured_post).mean() 
+    neg_loglike = -(dist.log_prob(estimated_code_value * reshape_weights))
+    
+    critic_loss = neg_loglike.mean()
+    metrics = {'critic': dist.mode().mean()}
+    return critic_loss, metrics
+
+  def reshape_seq(self, seq, obslen, n_batches):
+    hor = self.config.imag_horizon
+    flatten = lambda x: x.reshape([-1] + list(x.shape[2:]))
+    flat_seq = flatten(seq)
+    accum_seq = None
+    for i in range(n_batches):
+      start = i*hor*obslen
+      batch_accum = flat_seq[start:start + hor*(obslen-hor)]
+      start += hor*(obslen-hor)
+      extra_seq = [flat_seq[start+(j*hor):start+(j*hor)+(hor-j)] for j in range(hor)]
+      
+      if accum_seq is None: accum_seq = tf.concat([batch_accum, tf.concat(extra_seq,0)],0)
+      else: accum_seq = tf.concat([accum_seq, batch_accum, tf.concat(extra_seq,0)],0)
+    # shape = (obslen*n_batches*hor - the unneeded parts, 2048)
+    return accum_seq
+
+  def itervaml_helper(self, post_val):
+    # NOTE: this code won't work well if config.imag_horizon >> seqlen
+    # post_val shape = (batch, seqlen) == (16,50,2048)
+    # output: (horizon, batch*seqlen) == (obslen*n_batches*hor - extra,2048)
+    hor = self.config.imag_horizon
+    seqlen = post_val.shape[1]
+    reshape_batch = lambda x: tf.concat([x[i:i+hor] if i <= (seqlen - hor) 
+                                        else x[i:] for i in range(seqlen)],0) # row/batch = (50,) -> (50*15 - extra)
+    all_batches = tf.concat([reshape_batch(post_val[i]) for i in range(post_val.shape[0])], 0)
+    return all_batches
 
   def target(self, seq):
     # States:     [z0]  [z1]  [z2]  [z3]
